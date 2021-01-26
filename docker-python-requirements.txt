@@ -1,0 +1,16 @@
+torch==1.7.1+cpu
+torchvision==0.8.2+cpu
+utils
+# numpy
+# ninja
+# pyyaml
+# mkl
+# mkl-include
+# setuptools
+# cmake
+# cffi
+# typing_extensions
+# future
+# six
+# requests
+# dataclasses
