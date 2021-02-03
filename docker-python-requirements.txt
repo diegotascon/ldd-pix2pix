@@ -1,6 +1,8 @@
 torch==1.7.1+cpu
 torchvision==0.8.2+cpu
-utils
+utils==1.0.1
+matplotlib==3.3.3
+tensorboard==2.4.1
 # numpy
 # ninja
 # pyyaml
