@@ -30,7 +30,7 @@ parser.add_argument('--side_size', type=int, default=286, help='size of every si
 parser.add_argument('--crop_size', type=int, default=1000, help='size of every image crop side')
 parser.add_argument('--gt_dir', type=str, default='/gt', help='ground truth image masks folder specific path')
 parser.add_argument('--images_dir', type=str, default='/images', help='images folder specific path')
-parser.add_argument('--log_dir', type=str, default='/log', help='tensorboard log files specific path')
+parser.add_argument('--log_dir', type=str, default='log', help='tensorboard log files specific path')
 parser.add_argument('--tensor_ext', type=str, default='.npy', help='tensor data extension')
 parser.add_argument('--filename_count', type=int, default= 1, help='filename extension')
 parser.add_argument('--split_pattern', type=str, default='[0-6].tif', help='filtering pattern for train/validation split')
@@ -47,13 +47,13 @@ class ImageAugmentation():
         self.gt_dir    = gt_dir    # '/gt'
         # print(self.gt_dir)
         self.images_dir = images_dir # '/images'
-        self.log_dir =    log_dir    # '/log'
+        self.log_dir =    log_dir    # 'log'
         train_gt_dir          = join(dest_path, self.train_dir + self.gt_dir)
         train_images_dir      = join(dest_path, self.train_dir + self.images_dir)
-        train_tensorboard_dir = join(dest_path, self.train_dir + log_dir)
+        train_tensorboard_dir = join(dest_path, self.train_dir, self.log_dir)
         val_gt_dir            = join(dest_path, self.val_dir + self.gt_dir)
         val_images_dir        = join(dest_path, self.val_dir + self.images_dir)
-        val_tensorboard_dir   = join(dest_path, self.val_dir + self.log_dir)
+        val_tensorboard_dir   = join(dest_path, self.val_dir, self.log_dir)
 
 
         # Create directories in specified roots

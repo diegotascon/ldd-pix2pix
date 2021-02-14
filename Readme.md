@@ -21,7 +21,9 @@ Advised by professor [Eva Mohedano](https://www.linkedin.com/in/eva-mohedano-261
     2. [Accessing the dataset](#datasetaccess)
     3. [Finding the right parameters](#parameters)
 6. [The quest for improving the results](#improvingresults)
-7. [Final Tests](#final)
+    1. [Modifying the dataset to get more details](#moredetails)
+    2. [VGG Loss](#vggloss)
+7. [The Google Cloud instance](#gcinstance)
     1. [Baseline Model on the 100k Dataset](#guse)
     2. [Training the Question Channel](#question)
         1. [Word Embedding + LSTM](#lstm)
@@ -46,13 +48,7 @@ In this project we're exploring the possibilities of applying conditional GANs t
 ## Motivation <a name="motivation"></a>
 *To be rewritten*
 
-We have decided to do this project because we considered that being able to answer a question from an image using AI it's 'cool' and, more importantly, it is a project that due to the multimodal approach requires that you must understand two of the most important disciplines in AI-DL: vision and language processing.
-
-In addition it's a relatively new area (papers from 2014, 2015, ...) with plenty of opportunities for improvement and several possible business applications: 
-* Image retrieval - Product search in digital catalogs (e.g: Amazon)
-* Human-computer interaction (e.g.: Ask to a camera the weather)
-* Intelligence Analysis
-* Support visually impaired individuals
+Conditional GANs offer multiple applications. Using them with satellite images sounded attractive. Moreover, annotating images, specially aerial ones, is a hard and very time consuming task. A cGAN trained to generate images from forged masks can help increasing the size of aerial datasets.
 
 <p align="right"><a href="#toc">To top</a></p>
 
@@ -79,9 +75,9 @@ The whole training set is 15GB of space, as satellite images are 72MB each one a
 <p align="right"><a href="#toc">To top</a></p>
 
 # Working environment <a name="working_env"></a>
-We have developed the project using [Google Colab](https://colab.research.google.com/), which gave us easy and free access to GPUs. We've used both local Colab and Google Drive storage. For some parts, though, we've also used a local python container based on the offical [Docker Hub image](https://hub.docker.com/_/python).
+We have developed the project using [Google Colab](https://colab.research.google.com/), which gave us easy and free access to GPUs. We've used both local Colab and Google Drive storage. For some parts, though, we've also used a local python container based on the offical [Docker Hub image](https://hub.docker.com/_/python). We've also used a [Google Cloud](https://cloud.google.com/) Deep Learning VM instance for longer trainings.
 
-<p ><img src="images/02-collab.jpg" width="200"> <img src="images/02-gdrive.png" width="200"> <img src="images/02-docker-logo.png" width="200"></p>
+<p ><img src="images/02-collab.jpg" width="200"> <img src="images/02-gdrive.png" width="200"> <img src="images/02-docker-logo.png" width="200"> <img src="images/02-googlecloud.jpg" width="200"></p>
 
 <p align="right"><a href="#toc">To top</a></p>
 
@@ -122,19 +118,107 @@ Rising the original learning rate of 0.0002 to 0.002 collapsed the training: the
 
 <p> <img src="images/05-CollapsedPSNR.png"> </p>
 
-Other values tested for the learning rate (0.0001, 0.0003, 0.001) didn't improve the quality of the obtained images. On the hand, we found that the lambda had a bigger influence in the capacity of the model to learn. With the standard lambda of 10, the model losses flattened after few epochs:
+Other values tested for the learning rate (0.0001, 0.0003, 0.001) didn't improve the quality of the obtained images. That wasn't he case of the lambda. We found that the lambda had a bigger influence in the capacity of the model to learn. With the standard lambda of 10, the model losses flattened after few epochs:
 
 <p> <img src="images/05-FlatLosses.png"></p>
 
 On the other hand, larger lambda values of 25, 50 and 100 helped the model to improve the quality of images proportionally to the number of epochs:
 
 <p><img src="images/05-ProgressingLosses.png"></p>
+Ground truth mask and generated image (from the training set) in epoch 400:
 <p><img src="images/05-TestImageEpoch400.png"></p>
+Epoch 900:
 <p><img src="images/05-TestImageEpoch900.png"></p>
 
-## The quest for improving the results <a name="improvingresults"></a>
+Our baseline model generated reasonable decent images with our validation masks:
+
+<div id="baselineresults">
+    Generated images:
+    <div id="baselinesgenerated">
+        <img src="images/NoSplitLR0.0002-Lambda100/Generated-austin29.jpeg">
+        <img src="images/NoSplitLR0.0002-Lambda100/Generated-chicago29.jpeg">
+        <img src="images/NoSplitLR0.0002-Lambda100/Generated-kitsap29.jpeg">
+        <img src="images/NoSplitLR0.0002-Lambda100/Generated-tyrol-w29.jpeg">
+        <img src="images/NoSplitLR0.0002-Lambda100/Generated-vienna29.jpeg">
+    </div>
+    Ground truth satellite images:
+    <div id="validationgt">
+        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-austin29.jpeg">
+        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-chicago29.jpeg">
+        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-kitsap29.jpeg">
+        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-tyrol-w29.jpeg">
+        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-vienna29.jpeg">
+    </div>
+</div>
+
+# The quest for improving the results <a name="improvingresults"></a>
 With a LR of 0.0002 and a lambda of 100 we had a good baseline to improve the results. Many options were at hand:
 
 - Splitting the training images would allow the model to learn more detailed information from the satellite pictures: cars, trees, ...
 - Using a different content loss, like [VGG Loss](https://paperswithcode.com/method/vgg-loss), to let the model learn a more perceptual similarity generation
+- Using [instance normalization](https://arxiv.org/abs/1607.08022) instead of batch normalization
 - <strong> More to be added </strong>
+
+## Modifying the dataset to get more details <a name="moredetails"></a>
+The results obtained in our best trainings were far from detailed. The model is originally conceived to receive and produce 256x256 images and we trained it with resized 286x286 images from the 5.000x5.000 originals. That meant we were reducing by 306 times the original images and masks.
+
+So we made up a new dataset splitting the original images and masks into smaller squares. From a couple of a 5.000x5.000 image and mask, we obtained 25 1.000x1.000 images and masks. When resized to 286x286, they were only 12 times samller. That would allow the model learn more details from the images at the cost of having 25 times more images to process. The new dataset was also already resized and normalized, as explained [before](#datasetaccess).
+
+25 times more images would mean spending 5 minutes and a half for every epoch. That is 9 hours for 100 epochs in Google Colab, way too much for the limits the free platform offers. So we decided to create a Google Cloud instance overcome the usage limits of Colab. You can find more details about the instance in [this section](#gcinstance).
+
+As a first test, we created a dataset splitting masks and images only by 2x2, obtaining 540 training 2.500x2.500 couples, 120 test couples and leaving 60 couples for validation. We spent some time to find the best combination of parameters (data loader threads, batch and test batch sizes). A surprise was awaiting: if we could train on Colab spending 13 seconds per epoch (should be 52 sec/epoch with 540 couples), every epoch lasted 97 seconds in our new shining cloud environment. We made a 900 epoch training anyway, which lasted almost 25 hours at a cost of around 16€.
+
+Although the intermediate results recorded in tensorboard were promising, the validation images generated showed color problems. We generated two sets of images: one feeding the whole mask to produce a single 256x256 image:
+
+<div id="fullmaskwith2x2training">
+    Generated images:
+    <div id="fullmaskwith2x2traininggenerated">
+        <img src="images/Split2x2-fullsize/Generated-austin29.jpeg">
+        <img src="images/Split2x2-fullsize/Generated-chicago29.jpeg">
+        <img src="images/Split2x2-fullsize/Generated-kitsap29.jpeg">
+        <img src="images/Split2x2-fullsize/Generated-tyrol-w29.jpeg">
+        <img src="images/Split2x2-fullsize/Generated-vienna29.jpeg">
+    </div>
+    Ground truth satellite images:
+    <div id="fullmaskwith2x2trainingvalidation">
+        <img src="images/Split2x2-fullsize/OriginalResized-austin29.jpeg">
+        <img src="images/Split2x2-fullsize/OriginalResized-chicago29.jpeg">
+        <img src="images/Split2x2-fullsize/OriginalResized-kitsap29.jpeg">
+        <img src="images/Split2x2-fullsize/OriginalResized-tyrol-w29.jpeg">
+        <img src="images/Split2x2-fullsize/OriginalResized-vienna29.jpeg">
+    </div>
+</div>
+
+In the second set with split the mask into 4 256x256 tiles and thus we generated 4 256x256 splits joined afterwards:
+
+<div id="2x2maskwith2x2training">
+    Generated images:
+    <div id="2x2maskwith2x2traininggenerated">
+        <img src="images/Split2x2-2x2/Generated-austin29.jpeg">
+        <img src="images/Split2x2-2x2/Generated-chicago29.jpeg">
+        <img src="images/Split2x2-2x2/Generated-kitsap29.jpeg">
+        <img src="images/Split2x2-2x2/Generated-tyrol-w29.jpeg">
+        <img src="images/Split2x2-2x2/Generated-vienna29.jpeg">
+    </div>
+    Ground truth satellite images:
+    <div id="2x2maskwith2x2trainingvalidation">
+        <img src="images/Split2x2-2x2/OriginalResized-austin29.jpeg">
+        <img src="images/Split2x2-2x2/OriginalResized-chicago29.jpeg">
+        <img src="images/Split2x2-2x2/OriginalResized-kitsap29.jpeg">
+        <img src="images/Split2x2-2x2/OriginalResized-tyrol-w29.jpeg">
+        <img src="images/Split2x2-2x2/OriginalResized-vienna29.jpeg">
+    </div>
+</div>
+
+We also made another training with a slightly different approach. We trained our already trained baseline model with the new tiles dataset. *_To be continued..._*
+
+
+## VGG Loss <a name="vggloss"></a>
+
+Another strategy to improve the quality of the generated images could be replacing our L1 content loss by the [VGG loss](https://paperswithcode.com/method/vgg-loss).
+
+To calculate the VGG loss, a VGG model pretrained on ImageNet classification is used. In the generator training phase, the L1 loss used to compare the generated satellite image and the ground truth satellite image is substituted by a comparison between the classification labels issued by the VGG model between the same both satellite images (generated and GT). The inctuition behind this is that if both images are similar, the labels and confidence scores resulting from the inference of the VGG network will also be similar.
+
+The first results didn't improve apparently those from our baseline training.
+
+*_To be continued..._*

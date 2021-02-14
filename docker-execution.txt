@@ -1,5 +1,0 @@
-Image creation:   docker image build -t mrzhuimage .
-
-Image execution:  docker container run -it --rm -v $(pwd):/app -v $(pwd)/../Datasets:/Datasets mrzhuimage bash
-
-Script execution: python transform-dataset.py
