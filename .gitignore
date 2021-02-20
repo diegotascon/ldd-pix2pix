@@ -1,3 +1,5 @@
 *.zip
 *.tif
 __pycache__
+nogit
+checkpoints

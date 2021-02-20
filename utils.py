@@ -217,12 +217,20 @@ def save_checkpoint(epoch, net_g, net_d, optimizer_g, optimizer_d):
         os.makedirs(name = checkpoint_dir, exist_ok=True)
         net_g_model_out_path = os.path.join(checkpoint_dir, "netG_model_epoch_{}.pth".format(epoch))
         net_d_model_out_path = os.path.join(checkpoint_dir, "netD_model_epoch_{}.pth".format(epoch))
-        optimizer_g_out_path = os.path.join(checkpoint_dir, "adam_g_epoch_{}.pth".format(epoch))
-        optimizer_d_out_path = os.path.join(checkpoint_dir, "adam_d_epoch_{}.pth".format(epoch))
-        torch.save(net_g, net_g_model_out_path)
-        torch.save(net_d, net_d_model_out_path)
-        torch.save(optimizer_g, optimizer_g_out_path)
-        torch.save(optimizer_d, optimizer_d_out_path)
+        # optimizer_g_out_path = os.path.join(checkpoint_dir, "adam_g_epoch_{}.pth".format(epoch))
+        # optimizer_d_out_path = os.path.join(checkpoint_dir, "adam_d_epoch_{}.pth".format(epoch))
+        
+        # Let's get rid of saving path dependencies with state_dict
+        # torch.save(net_g, net_g_model_out_path)
+        torch.save({'net_g': net_g.state_dict(),
+                    'optim_g': optimizer_g.state_dict()},
+                   net_g_model_out_path)
+        # torch.save(net_d, net_d_model_out_path)
+        torch.save({'net_d': net_d.state_dict(),
+                    'optim_d': optimizer_d.state_dict()},
+                   net_d_model_out_path)
+        # torch.save(optimizer_g, optimizer_g_out_path)
+        # torch.save(optimizer_d, optimizer_d_out_path)
         print("Checkpoint for epoch {} saved".format(epoch))
 
         if opt.stop_after_checkpoint == 1:

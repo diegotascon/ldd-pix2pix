@@ -30,6 +30,7 @@ def get_scheduler(optimizer, opt):
     elif opt.lr_policy == 'step':
         scheduler = lr_scheduler.StepLR(optimizer, step_size=opt.lr_decay_iters, gamma=0.1)
     elif opt.lr_policy == 'plateau':
+        # https://pytorch.org/docs/stable/optim.html#torch.optim.lr_scheduler.ReduceLROnPlateau
         scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.2, threshold=0.01, patience=5)
     elif opt.lr_policy == 'cosine':
         scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=opt.niter, eta_min=0)
@@ -40,11 +41,15 @@ def get_scheduler(optimizer, opt):
 
 # UPDATE_LEARNING_RATE
 # update learning rate (called once every epoch)
-def update_learning_rate(scheduler, optimizer):
-    scheduler.step()
+# DTT 18/02/21 New loss parameter added to avoid error calling scheduler.step()
+#              when using ReduceLROnPlateau
+def update_learning_rate(scheduler, optimizer, loss=None):
+    if opt.lr_policy == 'plateau':
+        scheduler.step(loss)
+    else:
+        scheduler.step()
     lr = optimizer.param_groups[0]['lr']
     print('learning rate = %.7f' % lr)
-
 
 # INITIALIZE WEIGHTS
 def init_weights(net, init_type='normal', gain=0.02):

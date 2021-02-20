@@ -23,16 +23,10 @@ Advised by professor [Eva Mohedano](https://www.linkedin.com/in/eva-mohedano-261
 6. [The quest for improving the results](#improvingresults)
     1. [Modifying the dataset to get more details](#moredetails)
     2. [VGG Loss](#vggloss)
+    3. [Instance Normalization](#instancenorm)
+    4. [Using the ReduceLROnPlateau scheduler](#plateau")
 7. [The Google Cloud instance](#gcinstance)
-    1. [Baseline Model on the 100k Dataset](#guse)
-    2. [Training the Question Channel](#question)
-        1. [Word Embedding + LSTM](#lstm)
-        2. [GloVe LSTM](#glove)
-     3. [Results Summary](#resultssummary)
 8. [Result analysis](#results)
-    1. [Accuracies by question type (*best accuracies excluding yes/no questions*)](#best)
-    2. [Accuracies by question type (*worst accuracies excluding yes/no questions*)](#worst)
-    3. [Interesting samples](#interestingsamples)
 9. [Conclusions and Lessons Learned](#conclusions)
 10. [Next steps](#next_steps)
 11. [References](#references)
@@ -92,9 +86,9 @@ The generator is implemented with a U-Net of ResNet blocks:
 
 <p> <img src="images/03-pix2pix-U-Net-resnets.svg"> </p>
 
-The discriminator is implemented with a PatchGAN, a fully convolutional model which is able to capture more details from the image:
+The discriminator is implemented with a PatchGAN, a fully convolutional model which is able to capture more details from the image. As the discriminator acts as a loss, two images are fed into this network:
 
-<p> <strong>Image to be provided </strong></p>
+<p> <img src="images/03-pix2pix-PatchGAN.svg"></p>
 
 <p align="right"><a href="#toc">To top</a></p>
 
@@ -135,21 +129,23 @@ Our baseline model generated reasonable decent images with our validation masks:
 <div id="baselineresults">
     Generated images:
     <div id="baselinesgenerated">
-        <img src="images/NoSplitLR0.0002-Lambda100/Generated-austin29.jpeg">
-        <img src="images/NoSplitLR0.0002-Lambda100/Generated-chicago29.jpeg">
-        <img src="images/NoSplitLR0.0002-Lambda100/Generated-kitsap29.jpeg">
-        <img src="images/NoSplitLR0.0002-Lambda100/Generated-tyrol-w29.jpeg">
-        <img src="images/NoSplitLR0.0002-Lambda100/Generated-vienna29.jpeg">
+        <img src="images/NoSplitLR0.0002-Lambda100/Generated-austin29.jpeg" width=19%>
+        <img src="images/NoSplitLR0.0002-Lambda100/Generated-chicago29.jpeg" width=19%>
+        <img src="images/NoSplitLR0.0002-Lambda100/Generated-kitsap29.jpeg" width=19%>
+        <img src="images/NoSplitLR0.0002-Lambda100/Generated-tyrol-w29.jpeg" width=19%>
+        <img src="images/NoSplitLR0.0002-Lambda100/Generated-vienna29.jpeg" width=19%>
     </div>
     Ground truth satellite images:
     <div id="validationgt">
-        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-austin29.jpeg">
-        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-chicago29.jpeg">
-        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-kitsap29.jpeg">
-        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-tyrol-w29.jpeg">
-        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-vienna29.jpeg">
+        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-austin29.jpeg" width=19%>
+        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-chicago29.jpeg" width=19%>
+        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-kitsap29.jpeg" width=19%>
+        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-tyrol-w29.jpeg" width=19%>
+        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-vienna29.jpeg" width=19%>
     </div>
 </div>
+
+<p align="right"><a href="#toc">To top</a></p>
 
 # The quest for improving the results <a name="improvingresults"></a>
 With a LR of 0.0002 and a lambda of 100 we had a good baseline to improve the results. Many options were at hand:
@@ -157,12 +153,13 @@ With a LR of 0.0002 and a lambda of 100 we had a good baseline to improve the re
 - Splitting the training images would allow the model to learn more detailed information from the satellite pictures: cars, trees, ...
 - Using a different content loss, like [VGG Loss](https://paperswithcode.com/method/vgg-loss), to let the model learn a more perceptual similarity generation
 - Using [instance normalization](https://arxiv.org/abs/1607.08022) instead of batch normalization
+- Use the [ReduceLROnPlateau](https://pytorch.org/docs/stable/optim.html#torch.optim.lr_scheduler.ReduceLROnPlateau) scheduler
 - <strong> More to be added </strong>
 
 ## Modifying the dataset to get more details <a name="moredetails"></a>
 The results obtained in our best trainings were far from detailed. The model is originally conceived to receive and produce 256x256 images and we trained it with resized 286x286 images from the 5.000x5.000 originals. That meant we were reducing by 306 times the original images and masks.
 
-So we made up a new dataset splitting the original images and masks into smaller squares. From a couple of a 5.000x5.000 image and mask, we obtained 25 1.000x1.000 images and masks. When resized to 286x286, they were only 12 times samller. That would allow the model learn more details from the images at the cost of having 25 times more images to process. The new dataset was also already resized and normalized, as explained [before](#datasetaccess).
+So we made up a new dataset splitting the original images and masks into smaller squares. From a couple of a 5.000x5.000 image and mask, we obtained 25 1.000x1.000 images and masks. When resized to 286x286, they were only 12 times smaller. That would allow the model to learn more details from the images at the cost of having 25 times more images to process. The new dataset was also already resized and normalized, as explained [before](#datasetaccess).
 
 25 times more images would mean spending 5 minutes and a half for every epoch. That is 9 hours for 100 epochs in Google Colab, way too much for the limits the free platform offers. So we decided to create a Google Cloud instance overcome the usage limits of Colab. You can find more details about the instance in [this section](#gcinstance).
 
@@ -173,44 +170,137 @@ Although the intermediate results recorded in tensorboard were promising, the va
 <div id="fullmaskwith2x2training">
     Generated images:
     <div id="fullmaskwith2x2traininggenerated">
-        <img src="images/Split2x2-fullsize/Generated-austin29.jpeg">
-        <img src="images/Split2x2-fullsize/Generated-chicago29.jpeg">
-        <img src="images/Split2x2-fullsize/Generated-kitsap29.jpeg">
-        <img src="images/Split2x2-fullsize/Generated-tyrol-w29.jpeg">
-        <img src="images/Split2x2-fullsize/Generated-vienna29.jpeg">
+        <img src="images/Split2x2-fullsize/Generated-austin29.jpeg" width=19%>
+        <img src="images/Split2x2-fullsize/Generated-chicago29.jpeg" width=19%>
+        <img src="images/Split2x2-fullsize/Generated-kitsap29.jpeg" width=19%>
+        <img src="images/Split2x2-fullsize/Generated-tyrol-w29.jpeg" width=19%>
+        <img src="images/Split2x2-fullsize/Generated-vienna29.jpeg" width=19%>
     </div>
     Ground truth satellite images:
     <div id="fullmaskwith2x2trainingvalidation">
-        <img src="images/Split2x2-fullsize/OriginalResized-austin29.jpeg">
-        <img src="images/Split2x2-fullsize/OriginalResized-chicago29.jpeg">
-        <img src="images/Split2x2-fullsize/OriginalResized-kitsap29.jpeg">
-        <img src="images/Split2x2-fullsize/OriginalResized-tyrol-w29.jpeg">
-        <img src="images/Split2x2-fullsize/OriginalResized-vienna29.jpeg">
+        <img src="images/Split2x2-fullsize/OriginalResized-austin29.jpeg" width=19%>
+        <img src="images/Split2x2-fullsize/OriginalResized-chicago29.jpeg" width=19%>
+        <img src="images/Split2x2-fullsize/OriginalResized-kitsap29.jpeg" width=19%>
+        <img src="images/Split2x2-fullsize/OriginalResized-tyrol-w29.jpeg" width=19%>
+        <img src="images/Split2x2-fullsize/OriginalResized-vienna29.jpeg" width=19%>
     </div>
 </div>
+<p></p>
 
-In the second set with split the mask into 4 256x256 tiles and thus we generated 4 256x256 splits joined afterwards:
+In the second set we split the mask into 4 tiles, resizing them to 256x256. Thus we generated 4 256x256 splits for every image. The color problems also showed up in that case.
 
 <div id="2x2maskwith2x2training">
     Generated images:
     <div id="2x2maskwith2x2traininggenerated">
-        <img src="images/Split2x2-2x2/Generated-austin29.jpeg">
-        <img src="images/Split2x2-2x2/Generated-chicago29.jpeg">
-        <img src="images/Split2x2-2x2/Generated-kitsap29.jpeg">
-        <img src="images/Split2x2-2x2/Generated-tyrol-w29.jpeg">
-        <img src="images/Split2x2-2x2/Generated-vienna29.jpeg">
+        <div>
+            <img src="images/Split2x2-2x2/Generated-austin29-1.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/Generated-austin29-3.jpeg" width=9%>
+            &nbsp;
+            <img src="images/Split2x2-2x2/Generated-chicago29-1.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/Generated-chicago29-3.jpeg" width=9%>
+            &nbsp;
+            <img src="images/Split2x2-2x2/Generated-kitsap29-1.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/Generated-kitsap29-3.jpeg" width=9%>
+            &nbsp;
+            <img src="images/Split2x2-2x2/Generated-tyrol-w29-1.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/Generated-tyrol-w29-3.jpeg" width=9%>
+            &nbsp;
+            <img src="images/Split2x2-2x2/Generated-vienna29-1.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/Generated-vienna29-3.jpeg" width=9%>
+        </div>
+        <div>
+            <img src="images/Split2x2-2x2/Generated-austin29-2.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/Generated-austin29-4.jpeg" width=9%>
+            &nbsp;
+            <img src="images/Split2x2-2x2/Generated-chicago29-2.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/Generated-chicago29-4.jpeg" width=9%>
+            &nbsp;
+            <img src="images/Split2x2-2x2/Generated-kitsap29-2.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/Generated-kitsap29-4.jpeg" width=9%>
+            &nbsp;
+            <img src="images/Split2x2-2x2/Generated-tyrol-w29-2.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/Generated-tyrol-w29-4.jpeg" width=9%>
+            &nbsp;
+            <img src="images/Split2x2-2x2/Generated-vienna29-2.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/Generated-vienna29-4.jpeg" width=9%>
+        </div>
     </div>
     Ground truth satellite images:
     <div id="2x2maskwith2x2trainingvalidation">
-        <img src="images/Split2x2-2x2/OriginalResized-austin29.jpeg">
-        <img src="images/Split2x2-2x2/OriginalResized-chicago29.jpeg">
-        <img src="images/Split2x2-2x2/OriginalResized-kitsap29.jpeg">
-        <img src="images/Split2x2-2x2/OriginalResized-tyrol-w29.jpeg">
-        <img src="images/Split2x2-2x2/OriginalResized-vienna29.jpeg">
+        <div>
+            <img src="images/Split2x2-2x2/OriginalResized-austin29-1.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/OriginalResized-austin29-3.jpeg" width=9%>
+            &nbsp;
+            <img src="images/Split2x2-2x2/OriginalResized-chicago29-1.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/OriginalResized-chicago29-3.jpeg" width=9%>
+            &nbsp;
+            <img src="images/Split2x2-2x2/OriginalResized-kitsap29-1.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/OriginalResized-kitsap29-3.jpeg" width=9%>
+            &nbsp;
+            <img src="images/Split2x2-2x2/OriginalResized-tyrol-w29-1.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/OriginalResized-tyrol-w29-3.jpeg" width=9%>
+            &nbsp;
+            <img src="images/Split2x2-2x2/OriginalResized-vienna29-1.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/OriginalResized-vienna29-3.jpeg" width=9%>
+        </div>
+        <div>
+            <img src="images/Split2x2-2x2/OriginalResized-austin29-2.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/OriginalResized-austin29-4.jpeg" width=9%>
+            &nbsp;
+            <img src="images/Split2x2-2x2/OriginalResized-chicago29-2.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/OriginalResized-chicago29-4.jpeg" width=9%>
+            &nbsp;
+            <img src="images/Split2x2-2x2/OriginalResized-kitsap29-2.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/OriginalResized-kitsap29-4.jpeg" width=9%>
+            &nbsp;
+            <img src="images/Split2x2-2x2/OriginalResized-tyrol-w29-2.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/OriginalResized-tyrol-w29-4.jpeg" width=9%>
+            &nbsp;
+            <img src="images/Split2x2-2x2/OriginalResized-vienna29-2.jpeg" width=9%>
+            <img src="images/Split2x2-2x2/OriginalResized-vienna29-4.jpeg" width=9%>
+        </div>
     </div>
 </div>
 
-We also made another training with a slightly different approach. We trained our already trained baseline model with the new tiles dataset. *_To be continued..._*
+For the sake of comparison, we generated 2x2 tiles with our baseline model using the same validation images and found that one of the vienna29 tiles already showed a fluorescent effect:
+
+<div id="2x2maskwithbaselinetraining">
+    <div>
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-1.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-1.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-kitsap29-1.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-kitsap29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-tyrol-w29-1.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-tyrol-w29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-vienna29-1.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-vienna29-3.jpeg" width=9%>
+    </div>
+    <div>
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-2.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-2.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-kitsap29-2.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-kitsap29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-tyrol-w29-2.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-tyrol-w29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-vienna29-2.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-vienna29-4.jpeg" width=9%>
+    </div>
+</div>
+
+
+We also made another training with a slightly different approach. We used our already pretrained baseline model and trained it again with the new tiles dataset. *_To be continued..._*
 
 
 ## VGG Loss <a name="vggloss"></a>
@@ -221,4 +311,85 @@ To calculate the VGG loss, a VGG model pretrained on ImageNet classification is 
 
 The first results didn't improve apparently those from our baseline training.
 
-*_To be continued..._*
+**To be continued...**
+
+## Instance normalization <a name="instancenorm"></a>
+
+[Instance normalization was successfully used in style transferring between images](https://arxiv.org/abs/1607.08022), improving the results of feed-forward generative models by simply replacing the existing batch normalization layers. Batch normalization affects a whole batch, while instance normalization is performed picture by picture, the result being independent on which images compose the batch:
+
+![](images/07-Normalisations.png)
+
+To give it a try we built a generator substituting all the batch normalization layers by instance normalization ones and trained the model against the same 135 full sized images of our baseline model. The control images seemed a little worse than those from our baseline model, but the validation ones had better defined building shapes. The non labelled areas showed less defined colors. It was remarkable that colors seemed more consistent than in the baseline (no slight tendency to show fluorescent colors). Images generated with full sized validation masks follow:
+
+<div id="fullsizemaskswithinstancenorm">
+    <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-kitsap29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-tyrol-w29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-vienna29.jpeg" width=19%>
+</div>
+
+When generating images with split 2x2 masks:
+
+<div id="2x2maskwithinstancenorm">
+    <div>
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29-1.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29-1.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-kitsap29-1.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-kitsap29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-tyrol-w29-1.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-tyrol-w29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-vienna29-1.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-vienna29-3.jpeg" width=9%>
+    </div>
+    <div>
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29-2.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29-2.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-kitsap29-2.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-kitsap29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-tyrol-w29-2.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-tyrol-w29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-vienna29-2.jpeg" width=9%>
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-vienna29-4.jpeg" width=9%>
+    </div>
+</div>
+
+In this second set of images non labelled areas show more grain effects. So it seems that colors are more stable, but the appearence looses a bit of realism.
+
+## Using the ReduceLROnPlateau scheduler <a name="plateau"></a>
+
+One of the changes we tried in order to overcome the loose of color precision was using a [ReduceLROnPlateau](https://pytorch.org/docs/stable/optim.html#torch.optim.lr_scheduler.ReduceLROnPlateau) scheduler instead of a LambdaLR one. Pix2pix uses two schedulers: one for the generator and one for the discriminator. ReduceLROnPlateau needs the losses to decide when to change the learning rate, so we fed the generator loss to its scheduler and the discriminator loss to its own scheduler. The result was a disaster: the LR fell down to 0 in few epochs:
+
+XXXXXXXX
+
+<p align="right"><a href="#toc">To top</a></p>
+
+# The Google Cloud instance <a name="gcinstance"></a>
+
+Google Colab is a great development and testing environment for deep learning applications. It gives you access to a machine with a GPU, the Jupyter based environment makes it very easy to mix code, text or images, ... and it's free!!  But it has its limits. When long trainings come, Colab limits the use of GPUs. More than 3 hours per day of intensive use of a GPU will get you to a "you're a naughty boy/girl" message (remember it is free). And what is more important, most production environments for training or inferencing are not Colab or Jupyter based.
+
+Both reasons were enough to follow the advice of our lecturers to create a [Google Cloud](https://cloud.google.com/) instance. As recommended, we opted for a Deep Learning VM instance with 2 CPUs, 13GB of RAM and an instance of a NVIDIA Tesla K80 GPU with 12GB of memory. To preinstall PyTorch 1.7 at least 50GB of disk are needed. We made a [log](infraestructures/GoogleCloudSetup.pdf) of most of the steps we made to make it work, including billing setup, permissions to all members of the team, gcloud command line tool installation, ... Don't expect it to be neither a manual nor a organised step by step guide.
+
+## Pros and cons <a name="prosandcons"></a>
+
+So we had a shiny new cloud environment with no time limitations and we began using it. Soon we realized it wasn't a marvellous solution:
+
+- **It is slower than Colab**: our first serious training (540 images coming from splitting by 2x2 the 135 full images we used in our baseline training) showed that every epoch lasted 104 seconds instead of the 52 seconds we expected (even using a bigger batch size). As all the images were stored in memory, disk access shouldn't be the problem. The CPU didn't seem busy, so we considered it coped feeding the GPU in time. The result was that training 900 epochs lasted almost 25 hours compared to the 3 hours it lasted the baseline training.
+- **It costs money**: no surprise here. The good news is that the first time you use Google Cloud you're awarded 300€ to test their services. As a reference, our 25 hour training costed 16€.
+
+So, why use the instance? Here are some reasons:
+- **Production experience**: the instance gives us the oportunity to adapt the code to a production alike environment. Well, we're sure it is still a simple environment (single instance, no shared storage, no REST APIs exposed), but it is a step forward compared to sticking to Google Colab.
+- **No time limit**: it allowes us running long trainings as a batch job, with no care about the limits of Colab or maintaining the session alive. The lack of time limits gives us more freedom, but money limits are still there.
+

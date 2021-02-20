@@ -1,42 +1,28 @@
-# from os import listdir
+# Accessing files
 from os.path import join
-# import os
-# import shutil
 
-# Treating the images
-# from PIL import Image
-# import numpy as np
-# import random
-import torch  ## Used in reference to torch.cuda
-# import torch.utils.data as data
+# Loading images
 from torch.utils.data import DataLoader
-# import torchvision.transforms as transforms
-# from matplotlib.pyplot import imshow
-# import matplotlib.pyplot as plt
+
+# Debugging
 import math  ## math.ceil used in debugging
 
 # Dealing with GPUs
 import torch.backends.cudnn as cudnn
+import torch  ## Used in reference to torch.cuda
 
 # Defining the networks
 import torch.nn as nn  ## nn losses used
-# from torch.nn import init
-# import functools
-# from torch.optim import lr_scheduler
 import torch.optim as optim  ## Adam used
 
 # Training
 from math import log10  ## Used in PSNR calculus
 import time ## Used to calculate training times
 
-# Tensorboard
-# from torch.utils.tensorboard import SummaryWriter
-# import datetime
-
 # Import arguments
 from arguments import opt
 
-# Import dataset
+# Import dataset class
 from dataset import DatasetFromFolder
 
 # Import model architecture
@@ -67,14 +53,17 @@ training_data_loader = DataLoader(dataset=train_set, num_workers=opt.threads, ba
 testing_data_loader = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.test_batch_size, shuffle=True)
 
 # CREATING NETWORKS
-# net_g = define_G(opt.input_nc, opt.output_nc, opt.ngf, 'batch', False, 'normal', 0.02, gpu_id=device)
+# net_g = define_G(opt.input_nc, opt.output_nc, opt.ngf, 'instance', False, 'normal', 0.02, gpu_id=device)
 if opt.load_pretrained == 0:
-  net_g = define_G(opt.input_nc, opt.output_nc, opt.ngf, 'batch', False, 'normal', 0.02, gpu_id=device)
-  net_d = define_D(opt.input_nc + opt.output_nc, opt.ndf, 'basic', gpu_id=device)
+    net_g = define_G(opt.input_nc, opt.output_nc, opt.ngf, 'batch', False, 'normal', 0.02, gpu_id=device)
+    net_d = define_D(opt.input_nc + opt.output_nc, opt.ndf, 'basic', gpu_id=device)
 else:
-  print('Loading pretrained models')
-  net_g = torch.load(join(opt.dest_train, 'checkpoint', 'netG_model_epoch_100.pth'), map_location=torch.device(device)).to(device)
-  net_d = torch.load(join(opt.dest_train, 'checkpoint', 'netD_model_epoch_100.pth'), map_location=torch.device(device)).to(device)
+    print('Loading pretrained models')
+    # https://pytorch.org/tutorials/beginner/saving_loading_models.html#saving-loading-a-general-checkpoint-for-inference-and-or-resuming-training
+    checkpoint_g = torch.load(join(opt.dest_train, 'checkpoint', 'netG_model_epoch_100.pth'), map_location=torch.device(device)).to(device)
+    checkpoint_d = torch.load(join(opt.dest_train, 'checkpoint', 'netD_model_epoch_100.pth'), map_location=torch.device(device)).to(device)
+    net_g = torch.load_state_dict(checkpoint_g['net_g'])
+    net_d = torch.load_state_dict(checkpoint_d['net_d'])
 
 criterionGAN = GANLoss().to(device)
 criterionL1 = nn.L1Loss().to(device)
@@ -82,12 +71,14 @@ criterionMSE = nn.MSELoss().to(device)
 
 # setup optimizer
 if opt.load_pretrained == 0:
-  optimizer_g = optim.Adam(net_g.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-  optimizer_d = optim.Adam(net_d.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+    optimizer_g = optim.Adam(net_g.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+    optimizer_d = optim.Adam(net_d.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 else:
-  print('Loading pretrained optimizers')
-  optimizer_g = torch.load(join(opt.dest_train, 'checkpoint', 'adam_g_epoch_100.pth'), map_location=torch.device(device))
-  optimizer_d = torch.load(join(opt.dest_train, 'checkpoint', 'adam_d_epoch_100.pth'), map_location=torch.device(device))
+   print('Loading pretrained optimizers')
+   # optimizer_g = torch.load(join(opt.dest_train, 'checkpoint', 'adam_g_epoch_100.pth'), map_location=torch.device(device))
+   # optimizer_d = torch.load(join(opt.dest_train, 'checkpoint', 'adam_d_epoch_100.pth'), map_location=torch.device(device))
+   optimizer_g = torch.load_state_dict(checkpoint_g['optim_g'])
+   optimizer_d = torch.load_state_dict(checkpoint_d['optim_d'])
   
 net_g_scheduler = get_scheduler(optimizer_g, opt)
 net_d_scheduler = get_scheduler(optimizer_d, opt)
