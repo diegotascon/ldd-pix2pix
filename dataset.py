@@ -124,11 +124,11 @@ class DatasetFromFolder(data.Dataset):
                 self.a_image_tensors[filename] = a.clone()
                 self.b_image_tensors[filename] = b.clone()
 
-        w_offset = random.randint(0, max(0, 286 - 256 - 1)) # 
-        h_offset = random.randint(0, max(0, 286 - 256 - 1))
+        w_offset = random.randint(0, max(0, opt.input_image_size - opt.input_image_size - 1)) # Originally max(0, 286 - 256 -1)
+        h_offset = random.randint(0, max(0, opt.input_image_size - opt.input_image_size - 1))
     
-        a = a[:, h_offset:h_offset + 256, w_offset:w_offset + 256]
-        b = b[:, h_offset:h_offset + 256, w_offset:w_offset + 256]
+        a = a[:, h_offset:h_offset + opt.input_image_size, w_offset:w_offset + opt.input_image_size]
+        b = b[:, h_offset:h_offset + opt.input_image_size, w_offset:w_offset + opt.input_image_size]
     
         # Pretransformed images are already normalized
         # a = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(a)

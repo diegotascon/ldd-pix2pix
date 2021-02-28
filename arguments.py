@@ -26,6 +26,11 @@ parser.add_argument('--threads', type=int, default=0, help='number of threads fo
 parser.add_argument('--seed', type=int, default=123, help='random seed to use. Default=123')
 parser.add_argument('--lamb', type=int, default=10, help='weight on L1 term in objective') # 
 
+# Size of the side of the image. Only square images are accepted
+parser.add_argument('--input_image_size', type=int, default=286, help='input image side size')
+# Size of the side of the image to be fed to the model. It will generate a squared image
+parser.add_argument('--model_side_size', type=int, default=256, help='image fed to the model side size')
+
 parser.add_argument('--source_path', type=str, default='/Datasets/Aerialdataset/train', help='source path from current directory')
 parser.add_argument('--dest_train', type=str, default='train', help='destination path from current directory')
 parser.add_argument('--dest_valid', type=str, default='test', help='destination path from current directory')

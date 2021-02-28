@@ -28,11 +28,11 @@ parser.add_argument('--dest_train', type=str, default='train', help='destination
 parser.add_argument('--dest_valid', type=str, default='valid', help='destination path from current directory')
 parser.add_argument('--side_size', type=int, default=286, help='size of every side (square output)')
 parser.add_argument('--crop_size', type=int, default=1000, help='size of every image crop side')
-parser.add_argument('--gt_dir', type=str, default='/gt', help='ground truth image masks folder specific path')
-parser.add_argument('--images_dir', type=str, default='/images', help='images folder specific path')
+parser.add_argument('--gt_dir', type=str, default='gt', help='ground truth image masks folder specific path')
+parser.add_argument('--images_dir', type=str, default='images', help='images folder specific path')
 parser.add_argument('--log_dir', type=str, default='log', help='tensorboard log files specific path')
 parser.add_argument('--tensor_ext', type=str, default='.npy', help='tensor data extension')
-parser.add_argument('--filename_count', type=int, default= 1, help='filename extension')
+parser.add_argument('--filename_count', type=int, default=1, help='filename extension')
 parser.add_argument('--split_pattern', type=str, default='[0-6].tif', help='filtering pattern for train/validation split')
 opt = parser.parse_args()
 print(opt)
@@ -44,15 +44,15 @@ class ImageAugmentation():
         self.dest_path = dest_path
         self.train_dir = train_dir # 'train'
         self.val_dir   = val_dir   # 'valid'
-        self.gt_dir    = gt_dir    # '/gt'
+        self.gt_dir    = gt_dir    # 'gt'
         # print(self.gt_dir)
-        self.images_dir = images_dir # '/images'
+        self.images_dir = images_dir # 'images'
         self.log_dir =    log_dir    # 'log'
-        train_gt_dir          = join(dest_path, self.train_dir + self.gt_dir)
-        train_images_dir      = join(dest_path, self.train_dir + self.images_dir)
+        train_gt_dir          = join(dest_path, self.train_dir, self.gt_dir)
+        train_images_dir      = join(dest_path, self.train_dir, self.images_dir)
         train_tensorboard_dir = join(dest_path, self.train_dir, self.log_dir)
-        val_gt_dir            = join(dest_path, self.val_dir + self.gt_dir)
-        val_images_dir        = join(dest_path, self.val_dir + self.images_dir)
+        val_gt_dir            = join(dest_path, self.val_dir, self.gt_dir)
+        val_images_dir        = join(dest_path, self.val_dir, self.images_dir)
         val_tensorboard_dir   = join(dest_path, self.val_dir, self.log_dir)
 
 
@@ -124,9 +124,9 @@ class ImageAugmentation():
     def __getitem__(self, idx = 0, k = opt.filename_count):
 
         # gt_files = [x for x in listdir(os.getcwd() + opt.source_path + self.gt_dir)]
-        gt_files = [x for x in listdir(opt.source_path + self.gt_dir)]
+        gt_files = [x for x in listdir(join(opt.source_path, self.gt_dir))]
         # img_files = [x for x in listdir(os.getcwd() + opt.source_path + self.images_dir)]
-        img_files = [x for x in listdir(opt.source_path + self.images_dir)]
+        img_files = [x for x in listdir(join(opt.source_path, self.images_dir))]
         dir_name = [self.gt_dir, self.images_dir]
         pattern = re.compile(opt.split_pattern)
         idx = idx
@@ -137,15 +137,15 @@ class ImageAugmentation():
                 #if (filename.endswith(extension) for extension in ["0.tif", "1.tif", "2.tif", "3.tif", "4.tif", "5.tif", "6.tif"]):
                 if (pattern.search(filename)):
                     print('Moving file {} into training folder'.format(filename))
-                    dest_dir = join(self.dest_path, self.train_dir + dir_name[idx])
+                    dest_dir = join(self.dest_path, self.train_dir, dir_name[idx])
                     # src_path = os.getcwd() + opt.source_path + '/' + dir_name[idx] + '/' + filename
-                    src_path = join(opt.source_path + dir_name[idx], filename)
+                    src_path = join(opt.source_path, dir_name[idx], filename)
                     self.crop_im(dest_dir, src_path, filename, opt.crop_size, k)
                 else:
                     print('Moving file {} into validation folder'.format(filename))
-                    dest_dir = join(self.dest_path, self.val_dir + dir_name[idx])
+                    dest_dir = join(self.dest_path, self.val_dir, dir_name[idx])
                     # src_path = os.getcwd() + opt.source_path + '/' + dir_name[idx] + '/' + filename
-                    src_path = join(opt.source_path + dir_name[idx], filename)
+                    src_path = join(opt.source_path, dir_name[idx], filename)
                     self.crop_im(dest_dir, src_path, filename, opt.crop_size, k)
             idx += 1   
 

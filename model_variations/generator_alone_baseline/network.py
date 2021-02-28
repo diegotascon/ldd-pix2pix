@@ -347,7 +347,11 @@ class GANLoss(nn.Module):
         if use_lsgan:
             self.loss = nn.MSELoss()
         else:
-            self.loss = nn.BCELoss()
+            # We substitute the BCELoss by the BCEWithLogitsLoss used in the
+            # original pix2pix implementation as a CUDANN error arises with
+            # the former
+            # self.loss = nn.BCELoss()
+            self.loss = nn.BCEWithLogitsLoss()
 
     def get_target_tensor(self, input, target_is_real):
         if target_is_real:
