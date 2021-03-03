@@ -31,6 +31,7 @@ Advised by professor [Eva Mohedano](https://www.linkedin.com/in/eva-mohedano-261
 7. [The Google Cloud instance](#gcinstance)
 8. [Result analysis](#results)
 9. [Conclusions and Lessons Learned](#conclusions)
+    1. [Avg. PSNR as a quality metric](#psnr)
 10. [Next steps](#next_steps)
 11. [References](#references)
 12. [Additional samples](#samples)
@@ -85,11 +86,11 @@ We've implemented a pix2pix model using [PyTorch](https://pytorch.org/). Althoug
 
 The architecture of pix2pix is similar to that described for the original conditional GAN:
 
-<p> <img src="images/03-cGANeschema.png"> </p>
+<img src="images/03-cGANeschema.png">
 
 The generator is implemented with a U-Net of ResNet blocks:
 
-<p> <img src="images/03-pix2pix-U-Net-resnets.svg"> </p>
+<img src="images/03-pix2pix-U-Net-resnets.svg">
 
 The discriminator is implemented with a PatchGAN, a fully convolutional network designed to classify patches of an input image as real or fake, allowing to capture more details from the image. As the discriminator acts as a loss, two images are fed into this network:
 
@@ -126,9 +127,9 @@ What is the purpose of the lambda hyperparameter? When training the generator, t
 
 A part from the losses from the generator, the discriminator has a loss of its own (MSELoss). Those served us as a guide to what was happening with the model. Plus, in every epoch an average [PSNR](https://en.wikipedia.org/wiki/Peak_signal-to-noise_ratio) is calculated with a so called test batch.
 
-We started rising the original learning rate of 0.0002 to 0.002, which collapsed the training: the generator only produced blanck images.
+We started rising the original learning rate of 0.0002 to 0.002, which collapsed the training: the generator only produced blank images.
 
-<p> <img src="images/05-CollapsedPSNR.png"> </p>
+<p> <img src="images/05-CollapsedPSNR.png" width=49%> </p>
 
 Other values tested for the learning rate (0.0001, 0.0003, 0.001) didn't improve the quality of the obtained images. That wasn't he case of the lambda.
 
@@ -167,6 +168,7 @@ Epochs | 200, 500 | Lower epochs helped us to see trends, but the quality of the
 <p></p>
 Our baseline model generated reasonable decent images with our validation masks:
 
+<a name="baselineresults"></a>
 <div id="baselineresults">
     Masks for Austin29, Chicago29, Kitsap29, Tyrol-w29 and Vienna29:
     <div id="fullmaskbaseline">
@@ -208,6 +210,7 @@ The metrics showed similar to the previous training, with a higher final PSNR an
 
 Generating images with the validation masks, though, showed worse perceptual results. Both buildings and non-labelled areas appear less defined, and even some of the images show fluorescent colors:
 
+<a name="generatoraloneimages"></a>
 <div id="generatoralone">
     <img src="images/NoSplit-GeneratorAlone-FullSize/Generated-austin29.jpeg" width=19%>
     <img src="images/NoSplit-GeneratorAlone-FullSize/Generated-chicago29.jpeg" width=19%>
@@ -252,6 +255,7 @@ The avg. PSNR and losses obtained were similar to our baseline model training, e
 
 Although the intermediate results recorded in tensorboard were promising, the validation images generated showed color problems. We generated two sets of images: one feeding the whole mask to produce a single 256x256 image:
 
+<a name="fullmaskwith2x2training"></a>
 <div id="fullmaskwith2x2training">
     Generated images:
     <div id="fullmaskwith2x2traininggenerated">
@@ -274,6 +278,7 @@ Although the intermediate results recorded in tensorboard were promising, the va
 
 In the second set we split the mask into 4 tiles, resizing them to 256x256. Thus we generated 4 256x256 splits for every image. The color problems also showed up in that case.
 
+<a name="2x2maskwith2x2training"></a>
 <div id="2x2maskwith2x2training">
     Masks:
     <div id="2x2masks">
@@ -384,6 +389,7 @@ In the second set we split the mask into 4 tiles, resizing them to 256x256. Thus
 
 For the sake of comparison, we generated 2x2 tiles with our baseline model using the same validation masks and found that one of the Vienna29 (rightmost) tiles already showed a fluorescent effect:
 
+<a name="2x2maskwithbaselinetraining"></a>
 <div id="2x2maskwithbaselinetraining">
     <div>
         <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-1.jpeg" width=9%>
@@ -466,6 +472,7 @@ To avoid the color effects when training with the 2x2 split dataset from scratch
 
  Using fullsized masks also showed color problems, and the resulting images were frankly worse:
 
+ <a name="fullmaskwith2x2trainingfrombaseline"></a>
  <div id="fullmaskwith2x2trainingfrombaseline">
     <img src="images/Split2x2-frombaseline200epochs-fullsize/Generated-austin29.jpeg" width=19%>
     <img src="images/Split2x2-frombaseline200epochs-fullsize/Generated-chicago29.jpeg" width=19%>
@@ -496,6 +503,7 @@ XXX
 
 To give it a try we built a generator substituting all the batch normalization layers by instance normalization ones and trained the model against the same 135 full sized images of our baseline model. We used the same hyperparameters (learning rate, lambda, epochs, ...) used to train the baseline model. The control images seemed a little worse than those from our baseline model, but the validation ones had better defined building shapes. The non labelled areas showed less defined colors. It was remarkable that colors seemed more consistent than in the baseline (no slight tendency to show fluorescent colors). Images generated with full sized validation masks follow:
 
+<a name="fullsizemaskswithinstancenorm"></a>
 <div id="fullsizemaskswithinstancenorm">
     <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29.jpeg" width=19%>
     <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29.jpeg" width=19%>
@@ -559,31 +567,109 @@ The results showed that a change in the resolution of the images caused the mode
 
 Below you can see a comparison between the images obtained with the baseline model (left), the intance norm baseline (center) and the training try (right):
 
-<div id="fullsizefrom2x2instancenorm">
+<a name="2x2maskwithinstancenormbaselinetraining"></a>
+<div id="2x2maskwithinstancenormbaselinetraining">
     <div>
-        <img src="images/NoSplitLR0.0002-Lambda100/Generated-austin29.jpeg" width=32%>
-        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29.jpeg" width=32%>
-        <img src="images/Split2x2-fromInstanceNorm-200epochs-fullsize/Generated-austin29.jpeg" width=32%>
-    </div>
-    <div>
-        <img src="images/NoSplitLR0.0002-Lambda100/Generated-chicago29.jpeg" width=32%>
-        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29.jpeg" width=32%>
-        <img src="images/Split2x2-fromInstanceNorm-200epochs-fullsize/Generated-chicago29.jpeg" width=32%>
-    </div>
-    <div>
-        <img src="images/NoSplitLR0.0002-Lambda100/Generated-kitsap29.jpeg" width=32%>
-        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-kitsap29.jpeg" width=32%>
-        <img src="images/Split2x2-fromInstanceNorm-200epochs-fullsize/Generated-kitsap29.jpeg" width=32%>
-    </div>
-    <div>
-        <img src="images/NoSplitLR0.0002-Lambda100/Generated-tyrol-w29.jpeg" width=32%>
-        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-tyrol-w29.jpeg" width=32%>
-        <img src="images/Split2x2-fromInstanceNorm-200epochs-fullsize/Generated-tyrol-w29.jpeg" width=32%>
-    </div>
-    <div>
-        <img src="images/NoSplitLR0.0002-Lambda100/Generated-vienna29.jpeg" width=32%>
-        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-vienna29.jpeg" width=32%>
-        <img src="images/Split2x2-fromInstanceNorm-200epochs-fullsize/Generated-vienna29.jpeg" width=32%>
+        <div name="austin29up">
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-1.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-3.jpeg" width=15%>
+            &nbsp;
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29-1.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29-3.jpeg" width=15%>
+            &nbsp;
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-austin29-1.jpeg" width=15%>
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-austin29-3.jpeg" width=15%>
+        </div>
+        <div name="austin29down">
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-2.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-4.jpeg" width=15%>
+            &nbsp;
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29-2.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29-4.jpeg" width=15%>
+            &nbsp;
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-austin29-2.jpeg" width=15%>
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-austin29-4.jpeg" width=15%>
+        </div>
+        <div name="chicago29up">
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-1.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-3.jpeg" width=15%>
+            &nbsp;
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29-1.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29-3.jpeg" width=15%>
+            &nbsp;
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-chicago29-1.jpeg" width=15%>
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-chicago29-3.jpeg" width=15%>
+        </div>
+        <div name="chicago29down">
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-2.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-4.jpeg" width=15%>
+            &nbsp;
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29-2.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29-4.jpeg" width=15%>
+            &nbsp;
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-chicago29-2.jpeg" width=15%>
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-chicago29-4.jpeg" width=15%>
+        </div>
+        <div name="kitsap29up">
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-kitsap29-1.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-kitsap29-3.jpeg" width=15%>
+            &nbsp;
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-kitsap29-1.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-kitsap29-3.jpeg" width=15%>
+            &nbsp;
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-kitsap29-1.jpeg" width=15%>
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-kitsap29-3.jpeg" width=15%>
+        </div>
+        <div name="kitsap29down">
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-kitsap29-2.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-kitsap29-4.jpeg" width=15%>
+            &nbsp;
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-kitsap29-2.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-kitsap29-4.jpeg" width=15%>
+            &nbsp;
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-kitsap29-2.jpeg" width=15%>
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-kitsap29-4.jpeg" width=15%>
+        </div>
+        <div name="tyrol-w29up">
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-tyrol-w29-1.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-tyrol-w29-3.jpeg" width=15%>
+            &nbsp;
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-tyrol-w29-1.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-tyrol-w29-3.jpeg" width=15%>
+            &nbsp;
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-tyrol-w29-1.jpeg" width=15%>
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-tyrol-w29-3.jpeg" width=15%>
+        </div>
+        <div name="tyrol-w29down">
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-tyrol-w29-2.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-tyrol-w29-4.jpeg" width=15%>
+            &nbsp;
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-tyrol-w29-2.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-tyrol-w29-4.jpeg" width=15%>
+            &nbsp;
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-tyrol-w29-2.jpeg" width=15%>
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-tyrol-w29-4.jpeg" width=15%>
+        </div>
+        <div name="vienna29up">
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-vienna29-1.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-vienna29-3.jpeg" width=15%>
+            &nbsp;
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-vienna29-1.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-vienna29-3.jpeg" width=15%>
+            &nbsp;
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-vienna29-1.jpeg" width=15%>
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-vienna29-3.jpeg" width=15%>
+        </div>
+        <div name="vienna29down">
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-vienna29-2.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-vienna29-4.jpeg" width=15%>
+            &nbsp;
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-vienna29-2.jpeg" width=15%>
+            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-vienna29-4.jpeg" width=15%>
+            &nbsp;
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-vienna29-2.jpeg" width=15%>
+            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-vienna29-4.jpeg" width=15%>
+        </div>
     </div>
 </div>
 
@@ -629,6 +715,8 @@ While the buildings seem less defined than in the 256x256 training, the non-labe
 
 Another strategy to improve the quality of the generated images could be replacing our L1 content loss by the [VGG loss](https://paperswithcode.com/method/vgg-loss).
 
+XXX VGG Loss used in SRGANs: https://arxiv.org/pdf/1609.04802.pdf XXX
+
 To calculate the VGG loss, a VGG model pretrained on ImageNet classification is used. In the generator training phase, the L1 loss used to compare the generated satellite image and the ground truth satellite image is substituted by a comparison between the classification labels issued by the VGG model between the same both satellite images (generated and GT). The inctuition behind this is that if both images are similar, the labels and confidence scores resulting from the inference of the VGG network will also be similar.
 
 The first results didn't improve apparently those from our baseline training.
@@ -671,7 +759,11 @@ So, why use the instance? Here are some reasons:
 
 It's been a tough journey. While we soon obtained good results with the off-the-shelf implementation, we failed trying to improve them. Obtaining higher resolution images is a really difficult task. Looking for a static model has proven useless for us. Perhaps a more complex approach like [progressive growing of the GAN](https://arxiv.org/pdf/1710.10196.pdf) might have helped us.
 
+## Avg. PSNR as a quality metric <a name="psnr"></a>
 
+pix2pix uses MSE as a content loss. As stated in the proposal of a [super resolution GAN](https://arxiv.org/pdf/1609.04802.pdf) "_This is convenient as minimizing MSE also maximizes the peak signal-to-noise ratio (PSNR) ... However, the  ability of MSE (and PSNR) to capture perceptually relevant differences, such as high texture detail, is very limited as they are defined based on pixel-wise image differences_". This is coincident with our experience in our trainings. As we already said in our [first trainings](#parameters): a higher PSNR value, which systematically peaked between epoch 100 and 200, didn't correspond to better generated images.
+
+XXX Fréchet distance XXX
 
 <p align="right"><a href="#toc">To top</a></p>
 
