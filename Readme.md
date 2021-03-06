@@ -28,13 +28,13 @@ Advised by professor [Eva Mohedano](https://www.linkedin.com/in/eva-mohedano-261
     4. [VGG Loss](#vggloss)
     5. [Using the ReduceLROnPlateau scheduler](#plateau)
     6. [Feeding bigger images](#biggerimages)
-7. [The Google Cloud instance](#gcinstance)
-8. [Result analysis](#results)
+7. [Quality metrics](#metrics)
+    1. [Fréchet Inception Distance](#frechet)
+8. [The Google Cloud instance](#gcinstance)
 9. [Conclusions and Lessons Learned](#conclusions)
-    1. [Avg. PSNR as a quality metric](#psnr)
 10. [Next steps](#next_steps)
 11. [References](#references)
-12. [Additional samples](#samples)
+
 
 # Introduction <a name="intro"></a>
 Generative Adversarial Networks (GANs) were introduced by [Ian Goodfellow et al.](https://papers.nips.cc/paper/5423-generative-adversarial-nets) in 2014. GANs can make up realistic new samples from the distribution of images learned.
@@ -570,6 +570,7 @@ Below you can see a comparison between the images obtained with the baseline mod
 <a name="2x2maskwithinstancenormbaselinetraining"></a>
 <div id="2x2maskwithinstancenormbaselinetraining">
     <div>
+        Austin29
         <div name="austin29up">
             <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-1.jpeg" width=15%>
             <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-3.jpeg" width=15%>
@@ -590,6 +591,7 @@ Below you can see a comparison between the images obtained with the baseline mod
             <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-austin29-2.jpeg" width=15%>
             <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-austin29-4.jpeg" width=15%>
         </div>
+        Chicago29
         <div name="chicago29up">
             <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-1.jpeg" width=15%>
             <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-3.jpeg" width=15%>
@@ -610,6 +612,7 @@ Below you can see a comparison between the images obtained with the baseline mod
             <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-chicago29-2.jpeg" width=15%>
             <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-chicago29-4.jpeg" width=15%>
         </div>
+        Kitsap29
         <div name="kitsap29up">
             <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-kitsap29-1.jpeg" width=15%>
             <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-kitsap29-3.jpeg" width=15%>
@@ -630,6 +633,7 @@ Below you can see a comparison between the images obtained with the baseline mod
             <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-kitsap29-2.jpeg" width=15%>
             <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-kitsap29-4.jpeg" width=15%>
         </div>
+        Tyrol-W29
         <div name="tyrol-w29up">
             <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-tyrol-w29-1.jpeg" width=15%>
             <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-tyrol-w29-3.jpeg" width=15%>
@@ -650,6 +654,7 @@ Below you can see a comparison between the images obtained with the baseline mod
             <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-tyrol-w29-2.jpeg" width=15%>
             <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-tyrol-w29-4.jpeg" width=15%>
         </div>
+        Vienna29
         <div name="vienna29up">
             <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-vienna29-1.jpeg" width=15%>
             <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-vienna29-3.jpeg" width=15%>
@@ -685,7 +690,7 @@ Our first tests with few images and epochs showed that the model could learn mor
 
 The training showed that the shapes of the avg. PSNR and the losses could be similar to those of our baseline trainings, being the avg. PSNR slightly higher:
 
-<img src="images/08-512avgPSNR.png" width="33%"> <img src="images/08-512losses.png" width="66%">
+<img src="images/10-512avgPSNR.png" width="33%"> <img src="images/10-512losses.png" width="66%">
 
 The losses representation suffers from some bugs in its calculus when several trainings are enchained, but it can be seen that it has a descending trend over epochs. The control images showed that the model wasn't able to generate better images from a human perception perspective. The images generated from test masks (not seen by the model) confirmed that hypothesis (click them to see them in their original resolution):
 
@@ -713,15 +718,32 @@ While the buildings seem less defined than in the 256x256 training, the non-labe
 
 ## VGG Loss <a name="vggloss"></a>
 
-Another strategy to improve the quality of the generated images could be replacing our L1 content loss by the [VGG loss](https://paperswithcode.com/method/vgg-loss).
-
-XXX VGG Loss used in SRGANs: https://arxiv.org/pdf/1609.04802.pdf XXX
+Another strategy to improve the quality of the generated images could be replacing our L1 content loss by the [VGG loss](https://paperswithcode.com/method/vgg-loss). The VGG loss was first proposed in [super resolution GANs](https://arxiv.org/pdf/1609.04802.pdf) with the intention of overcoming the blurriness provoked by pixel-wise loss functions such as MSE or MAE. As explained in the paper, L1 or L2 losses consider pixels as individual elements not belonging to any pattern, oversmoothing textures.
 
 To calculate the VGG loss, a VGG model pretrained on ImageNet classification is used. In the generator training phase, the L1 loss used to compare the generated satellite image and the ground truth satellite image is substituted by a comparison between the classification labels issued by the VGG model between the same both satellite images (generated and GT). The inctuition behind this is that if both images are similar, the labels and confidence scores resulting from the inference of the VGG network will also be similar.
 
-The first results didn't improve apparently those from our baseline training.
+We made several toy trainings to have a first evaluation of the performance of this approach. With only 21 city full sized images from Austin, Chicago and Vienna, we trained the model for 900 epochs with a learning rate of 0.0002 and batch normalization. We added the VGG loss to the existing content L1 loss (lambdaL1 * L1 + lambdaVGG * VGG). The lambdas allowed to give more weight to the content losses with respect to the loss coming from the discriminator. We played with both lambda values:
 
-**To be continued... XXX**
+lambdaL1 | lambdaVGG | Results
+-------- | --------- | -------
+0 | 1 | Equivalent to substituting the L1 loss by the VGG loss with no weight. Discarded because of the bad quality of images
+1 | 2e-6 | Same parameters found in [a SRGAN implementation](https://github.com/tensorlayer/srgan). Discarded because the model exploded in training
+0 | 100 | Only VGG loss with a weight of 100. It gave decent results, although not so good as baseline ones. Kept for further research
+100 | 100 | Combination of the original L1 loss and the VGG loss, with a weight of 100 when combined with the discriminator's loss. Even better results, but not so good as baseline.
+75 | 25 | Discarded as the quality of images was below than those from the two kept values
+50 | 1 | Discarded as the quality of images was below than those from the two kept values
+
+Considering the kept toy trainings, the avg PSNR's shape changed when using only the VGG loss, although the values were much lower than with the original L1 loss. When combining both losses (100 in both lambdas), the shape during the training was quite similar to the original one but the final PSNR value ended up a bit higher. Following you can see a comparison between a training with only L1 (left), with only VGG loss (center) and combining both (right):
+
+![](images/08-VGGLossesPSNR.png)
+
+Perceptually, the results didn't apparently improve those from our baseline training. Between both tests, our impression was that combininng both losses showed slightly more realistic results than the VGG alone. In both cases checkerboard effects and repeating patterns appeared in blank non-labelled areas:
+
+![](images/08-VGGLossesTestImages.png)
+
+As these were toy trainings with few images from city landscapes, we decided to make a training with the two combinations of lambdas that gave the best results with the same dataset and same conditions as our baseline models to confirm whether the VGG loss wasn't that useful with the satellite images we worked with. You can find the Colab notebook we used [here](colab_notebooks/04_TrainImagesAlreadyTransformedVGG.ipynb).
+
+**XXX Training results pending XXX**
 
 <p align="right"><a href="#toc">To top</a></p>
 
@@ -731,6 +753,26 @@ One of the changes we tried in order to overcome the loose of color precision wa
 
 <img src="images/09-GeneratorsReduceLROnPlateau.png" width="49%"> <img src="images/09-DiscriminatorsReduceLROnPlateau.png" width="49%">
 
+
+<p align="right"><a href="#toc">To top</a></p>
+
+# Quality metrics <a name="metrics"></a>
+
+Our implementation of pix2pix calculates the average PSNR as a metric of the quality of the images crafted by the generator. In every training a bunch of images are reserved for validation purposes. It is the so called test dataset. The PSNR is based on the MSE between the images generated from the mask and the ground truth satellite image. As stated in the proposal of a [super resolution GAN](https://arxiv.org/pdf/1609.04802.pdf) "_... the  ability of MSE (and PSNR) to capture perceptually relevant differences, such as high texture detail, is very limited as they are defined based on pixel-wise image differences_". This is coincident with our experience in our trainings. As we already said in our [first trainings](#parameters), a higher PSNR value, which systematically peaked between epoch 100 and 200, didn't correspond to better generated images.
+
+## Fréchet Inception Distance (FID) <a name="frechet"></a>
+
+[Martin Heusel et al. introduced](https://arxiv.org/abs/1706.08500) in 2017 the Fréchet Inception Distance, a metric to capture the sharpiness and quality of forged images from GANs in a manner closer to a human eye than other existing methods. It is based on the [Inception score](https://arxiv.org/abs/1606.03498), which uses a pretrained Inception v3 model trained on ImageNet to predict the scores of made up images. FID compares the predictions of generated images with the predictions for the original ones and elaborates a distance metric. If images are identical, a 0 distance is issued. As the distance grows, the quality of generated images worsens.
+
+So to overcome the lack of correspondance between the PSNR and the quality we perceived from the generated images, we calculated the FID for the main trainings made throughout the project. A complete table XXX can be consulted in the repository. Below you can find a partial result:
+
+![](images/16-FIDresults.png)
+
+We found that the FID obtained was consistent with our observings in many examples. The [baseline](https://github.com/diegotascon/ldd-pix2pix#baselineresults) (328,378) performed better than the [generator alone test](https://github.com/diegotascon/ldd-pix2pix#generatoraloneimages) (379,982), the [model trained with 512x512 images](https://github.com/diegotascon/ldd-pix2pix#biggerimages) (398,007) and slightly better than the [instance normalisation baseline](https://github.com/diegotascon/ldd-pix2pix#fullsizemaskswithinstancenorm) (332,123). But we don't agree with the lower FIDs obtained in the trainings with 2x2 splits (both [from scratch](https://github.com/diegotascon/ldd-pix2pix#2x2maskwith2x2training) and [from the baseline](https://github.com/diegotascon/ldd-pix2pix#frombaseline)).
+
+We used an [implementation](https://github.com/mseitzer/pytorch-fid) simple to install through pip and easy to use.
+
+As a conclusion, the Fréchet Inception Distance can't be relied on as an image quality metric with our dataset.
 
 <p align="right"><a href="#toc">To top</a></p>
 
@@ -759,11 +801,6 @@ So, why use the instance? Here are some reasons:
 
 It's been a tough journey. While we soon obtained good results with the off-the-shelf implementation, we failed trying to improve them. Obtaining higher resolution images is a really difficult task. Looking for a static model has proven useless for us. Perhaps a more complex approach like [progressive growing of the GAN](https://arxiv.org/pdf/1710.10196.pdf) might have helped us.
 
-## Avg. PSNR as a quality metric <a name="psnr"></a>
-
-pix2pix uses MSE as a content loss. As stated in the proposal of a [super resolution GAN](https://arxiv.org/pdf/1609.04802.pdf) "_This is convenient as minimizing MSE also maximizes the peak signal-to-noise ratio (PSNR) ... However, the  ability of MSE (and PSNR) to capture perceptually relevant differences, such as high texture detail, is very limited as they are defined based on pixel-wise image differences_". This is coincident with our experience in our trainings. As we already said in our [first trainings](#parameters): a higher PSNR value, which systematically peaked between epoch 100 and 200, didn't correspond to better generated images.
-
-XXX Fréchet distance XXX
 
 <p align="right"><a href="#toc">To top</a></p>
 
