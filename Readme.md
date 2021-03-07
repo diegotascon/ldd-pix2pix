@@ -712,7 +712,7 @@ Comparing with instance normalization baseline generations:
     <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-vienna29.jpeg" width=19%>
 </div>
 
-While the buildings seem less defined than in the 256x256 training, the non-labelled areas suffer from a much less realistic mix of green and grey (trees and roads) forms. On the other hand, no checkerboard effect is appreciated. Perhaps using bigger images requir more epochs to let the model capture high frequency details. That extra cost has to be considered a part from a already slower training compared to using 256x256 input images.
+On one hand the buildings seem less defined than in the 256x256 baseline training. On the other, the non-labelled areas suffer from a much less realistic mix of green and grey forms (trees and roads). As a positive outcome, no checkerboard effect is appreciated. We thought that perhaps using bigger images requires more epochs to let the model capture high frequency details. We gave it a try with 1200 epochs, but no improvement was appreciated.
 
 <p align="right"><a href="#toc">To top</a></p>
 
@@ -741,9 +741,59 @@ Perceptually, the results didn't apparently improve those from our baseline trai
 
 ![](images/08-VGGLossesTestImages.png)
 
-As these were toy trainings with few images from city landscapes, we decided to make a training with the two combinations of lambdas that gave the best results with the same dataset and same conditions as our baseline models to confirm whether the VGG loss wasn't that useful with the satellite images we worked with. You can find the Colab notebook we used [here](colab_notebooks/04_TrainImagesAlreadyTransformedVGG.ipynb).
+As these were toy trainings with few images from city landscapes, we decided to make a training with the two combinations of lambdas that gave the best results with the same dataset and same conditions as our baseline models to confirm whether the VGG loss wasn't that useful with the satellite images we worked with. You can find the Colab notebook we implemented [here](colab_notebooks/04_TrainImagesAlreadyTransformedVGG.ipynb).
 
-**XXX Training results pending XXX**
+<p align="right"><a href="#toc">To top</a></p>
+
+### VGG alone as content loss
+
+A full training substituting the L1 content loss by the VGG loss (with LambdaL1 to 0 and LambdaVGG to 100) using 135 full scale training images took 5h 20 minutes to complete. So, as a first takeaway, using the VGG loss requires much more computing resources compared to using only a L1 loss. Considering the avg PSNR metric, the full training kept the same shape seen in the toy training, although the final value was clearly lower than those obtained in the baselines. Regarding losses, both the discriminator's and the generator's ones showed progressive learning. This was our first time we saw the discriminator loss to go clearly down as the training progressed:
+
+<img src="images/08-VGGalonePSNR.png" width=33%> <img src="images/08-VGGaloneLosses.png" width=66%>
+
+We then created our test set of images to see the results:
+
+<a name="VGGalone"></a>
+<div id="VGGalone">
+    <img src="images/NoSplit-VGGalone/Generated-austin29.jpeg" width=19%>
+    <img src="images/NoSplit-VGGalone/Generated-chicago29.jpeg" width=19%>
+    <img src="images/NoSplit-VGGalone/Generated-kitsap29.jpeg" width=19%>
+    <img src="images/NoSplit-VGGalone/Generated-tyrol-w29.jpeg" width=19%>
+    <img src="images/NoSplit-VGGalone/Generated-vienna29.jpeg" width=19%>
+</div>
+
+The generated images seem quite realistic for us. When comparing with our instance norm baseline (see below), almost no checkerboard effect can be appreciated. Non-labelled areas are more uniform, in the sense that there's almost no mix of grey (road) and green (trees) shapes. Hence that in the countryside example of kitsap29 (in the middle), it decides to "paint" more trees while in tyrol-29 (mid-right) and vienna29 (rightmost) a sort of grass lands are painted. So the model apparently learned to distinguish between a mask based on a small village and a mask based on more populated areas. On the other hand, the buildings and streests in austin29 (leftmost) are less distinguishable than its instance norm baseline counterpart.
+
+<div id="fullsizemaskswithinstancenorm">
+    <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-kitsap29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-tyrol-w29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-vienna29.jpeg" width=19%>
+</div>
+
+### Combining the VGG loss and the L1 loss
+
+As the toy trainings showed slightly better results when combining both a VGG loss with an L1 loss (LambdaL1 = 100 and LambdaVGG = 100), we then went for a full training with the same dataset and parameters. The training took 5h 26m and the progress values showed similar patterns as previous baselines except for the discriminator's loss, which showed tendency to lower (except for a crazy rise soon recovered) ending down to almost 0. The avg PSNR ended in a much higher value than using only the VGG loss as content loss:
+
+<img src="images/08-VGGplusL1PSNR.png" width=32%> <img src="images/08-VGGplusL1DiscriminatorLoss.png" width=32%> <img src="images/08-VGGplusL1GeneratorLoss.png" width=32%>
+
+The expectations where high, but the results where deceiving:
+
+<a name="VGGplusL1"></a>
+<div id="VGGplusL1">
+    <img src="images/NoSplit-VGGplusL1/Generated-austin29.jpeg" width=19%>
+    <img src="images/NoSplit-VGGplusL1/Generated-chicago29.jpeg" width=19%>
+    <img src="images/NoSplit-VGGplusL1/Generated-kitsap29.jpeg" width=19%>
+    <img src="images/NoSplit-VGGplusL1/Generated-tyrol-w29.jpeg" width=19%>
+    <img src="images/NoSplit-VGGplusL1/Generated-vienna29.jpeg" width=19%>
+</div>
+
+The resulting images are really blurry. The buildings are much less sharpen, the streets are much less realistic and non-labelled areas appear much less defined and full of checkerboard effects.
+
+
+As a conclusion, defining the content loss with a VGG loss can pay off in some datasets. In our case, where the training time almost doubled, we don't think it is worth the extra cost compared to our baseline models.
+
 
 <p align="right"><a href="#toc">To top</a></p>
 
@@ -768,7 +818,7 @@ So to overcome the lack of correspondance between the PSNR and the quality we pe
 
 ![](images/16-FIDresults.png)
 
-We found that the FID obtained was consistent with our observings in many examples. The [baseline](https://github.com/diegotascon/ldd-pix2pix#baselineresults) (328,378) performed better than the [generator alone test](https://github.com/diegotascon/ldd-pix2pix#generatoraloneimages) (379,982), the [model trained with 512x512 images](https://github.com/diegotascon/ldd-pix2pix#biggerimages) (398,007) and slightly better than the [instance normalisation baseline](https://github.com/diegotascon/ldd-pix2pix#fullsizemaskswithinstancenorm) (332,123). But we don't agree with the lower FIDs obtained in the trainings with 2x2 splits (both [from scratch](https://github.com/diegotascon/ldd-pix2pix#2x2maskwith2x2training) and [from the baseline](https://github.com/diegotascon/ldd-pix2pix#frombaseline)).
+We found that the FID obtained was consistent with our observings in many examples. The [baseline](#baselineresults) (328.378) performed better than the [generator alone test](#generatoraloneimages) (379,982), the [model trained with 512x512 images](#biggerimages) (398.007) and slightly better than the [instance normalisation baseline](#fullsizemaskswithinstancenorm) (332.123). But we don't agree with the lower FIDs obtained in the trainings with 2x2 splits (both [from scratch](#2x2maskwith2x2training) and [from the baseline](#frombaseline)). We're also surprised of such a low value of the [VGG alone model](#VGGalone) (232.636), as the quality of images are, for us, comparable to those from the [baseline](#baselineresults) or the [instance normalisation baseline](#fullsizemaskswithinstancenorm).
 
 We used an [implementation](https://github.com/mseitzer/pytorch-fid) simple to install through pip and easy to use.
 
@@ -799,9 +849,33 @@ So, why use the instance? Here are some reasons:
 
 # Conclusions and Lessons Learned <a name="conclusions"></a>
 
-It's been a tough journey. While we soon obtained good results with the off-the-shelf implementation, we failed trying to improve them. Obtaining higher resolution images is a really difficult task. Looking for a static model has proven useless for us. Perhaps a more complex approach like [progressive growing of the GAN](https://arxiv.org/pdf/1710.10196.pdf) might have helped us.
+It's been a tough journey. While we soon obtained good results with the off-the-shelf implementation, we failed trying to improve them. Obtaining higher resolution images is a really difficult task. Looking for a static model has proven useless for us. Perhaps a more complex approach like [progressive growing of a GAN](https://arxiv.org/pdf/1710.10196.pdf) might have helped us. In our case, training the model with zoomed in images from a checkpoint trained with the original resolution proved to be useless, as the model relearned the patterns almost from scracth.
 
+We faced color problems when using batch normalization, specially when we tried that the model learnt high resolution details with zoomed in images. All the pix2pix implementations we have consulted use batch normalization, so perhaps the problem comes from the dataset we have used.
+
+The dataset had a main drawback: only one label for buildings was specified. So non-labelled areas corresponded to a great variety of ground structures: rivers, trees, roads, raw lands, ... That made generating realistic images even more difficult in masks with big non-labelled areas.
+
+Fortunately we found that instance norm didn't suffer from the fluorescent colors effect, at the cost of longer trainings and more checkerboard effects in non-labelled areas.
+
+The VGG loss has proven useful to reduce checkerboard effects, but it has a high computational cost compared to using the original implementation with instance normalisation.
+
+Generating 256x256 images from a 5000x5000 images dataset is far from ideal. The magic of convolutions allowed us to train it to generate images of 512x512, but it didn't improve the perceived quality of images. Possibly, a deeper model (more layers or more feature maps) would allow to learn more fine-grained details. But this approach has clear limits: time and memory. A batch size of 4 was the maximum we could afford when training to issue 512x512 images with the selected environments.
+
+Our Google Cloud instance wasn't as useful as we expected with the chosen configuration. It was nice to give us a taste of what a production environment is, but now we would choose a more powerful setup. Specially, a superior GPU.
+
+Anyway, it's been a great experience trying to adapt a well known model to a specific dataset and target.
 
 <p align="right"><a href="#toc">To top</a></p>
 
 # Next steps <a name="next_steps"></a>
+
+The lack of time prevented us from trying some more ideas in our quest for obtaining more detailed images.
+
+We didn't try to substitute the original inner ResNet blocks with pretrained ones. We wonder if that would help the training and avoiding the color effects we suffered.
+
+We sticked to a pix2pix model, but many other variants of GANs could be tried:
+- [CycleGAN](https://junyanz.github.io/CycleGAN/)
+- [Contrastive Unpaired Translation](https://github.com/taesungp/contrastive-unpaired-translation)
+- [Super resolution GANs](https://arxiv.org/pdf/1609.04802.pdf)
+- [Progressive growing GAN](https://arxiv.org/pdf/1710.10196.pdf)
+
