@@ -744,7 +744,40 @@ Several conclusions were extracted from these results.
 2. The prevalence of green colors in non-labelled areas could be related to the lack of information in some input masks. Input images could clearly be categorized into urban and rural landscapes, being the latter defined by forestry landscapes, therefore masks with low pixel density (see next section for further explanation). 
 3. Generated images pale in comparison with ground-truth images. Zoomed-in images (2x2 cropped) provide/retain more information that could help the model better map objects. However, it could also make more visible or explicit weaknesses during the upscaling phase. Now the model has to “hallucinate” more information from the bottleneck point, therefore suffering from a lack of detail in the output if not enough information is provided as input. 
 
-XXX Images to be provided XXX
+<div id="2x2instancenorm">
+    <div>
+        <img src="images/Split2x2-InstanceNorm/Generated-austin29-1.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm/Generated-austin29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-InstanceNorm/Generated-chicago29-1.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm/Generated-chicago29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-InstanceNorm/Generated-kitsap29-1.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm/Generated-kitsap29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-InstanceNorm/Generated-tyrol-w29-1.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm/Generated-tyrol-w29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-InstanceNorm/Generated-vienna29-1.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm/Generated-vienna29-3.jpeg" width=9%>
+    </div>
+    <div>
+        <img src="images/Split2x2-InstanceNorm/Generated-austin29-2.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm/Generated-austin29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-InstanceNorm/Generated-chicago29-2.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm/Generated-chicago29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-InstanceNorm/Generated-kitsap29-2.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm/Generated-kitsap29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-InstanceNorm/Generated-tyrol-w29-2.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm/Generated-tyrol-w29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-InstanceNorm/Generated-vienna29-2.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm/Generated-vienna29-4.jpeg" width=9%>
+    </div>
+</div>
 
 Loss curves and PSNR shapes resemble to those of the baseline model. Losses converge towards a minimum, while PSNR steadily decreases over epoch time. Contrary to this metric’s logic, images at epoch 100 are visibly worse than at epoch 900.
 
@@ -813,7 +846,42 @@ Total time to completion (h) | 20
 
 Finally, images generated during inference are displayed in a grid-like format below (as in previous sections 4 images are presented for each city, both generated and ground truth).
 
-XXX Images to be provided XXX
+<a name="2x2instancenormfiltered"></a>
+<div id="2x2instancenormfiltered">
+    <div>
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-austin29-1.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-austin29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-chicago29-1.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-chicago29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-kitsap29-1.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-kitsap29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-tyrol-w29-1.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-tyrol-w29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-vienna29-1.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-vienna29-3.jpeg" width=9%>
+    </div>
+    <div>
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-austin29-2.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-austin29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-chicago29-2.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-chicago29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-kitsap29-2.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-kitsap29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-tyrol-w29-2.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-tyrol-w29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-vienna29-2.jpeg" width=9%>
+        <img src="images/Split2x2-InstanceNorm-Filtered/Generated-vienna29-4.jpeg" width=9%>
+    </div>
+</div>
+
 
 Training loss curves for both discriminator and generator are showed below as well as PSNR metric. Similar shapes as in previous models are found for PSNR and Generator Loss. Discriminator loss abruptly jumped several points at around epoch 260. Aside from that quirk, model converges steadily towards a minimum. Generator loss did not get stuck in a plateau, which is indicative that further training time could improve results.
 
@@ -829,7 +897,21 @@ As our attempts to improve the quality of images training both the baseline mode
 
 Our chosen pix2pix implementation, in training time, resizes images to 286x286 and, from there, crops them to 256x256. So, the generator is trained to accept 256x256 masks and output 256x256 satellite alike images. We decided to train the model using instance normalization resizing full images (no splitting) to 542x542 and cropping from them a 512x512 portion. That meant every content layer of the model would use 4 times more space to learn details of the images.
 
-Our first tests with few images and epochs showed that the model could learn more details. Of course, that had a cost: both the train and the validation (test) batch size had to be divided by 4 to avoid a memory overflow. We decided to go ahead with a training with parameters as close to the instance norm baseline training: 900 epochs with 135 training images, 30 validation images, batch size of 4, validation (test) batch size of 2, instance normalization (to avoid color issues), a learning rate of 0.0002 and a lambda of 100. We used Colab again (the Google Cloud instance was training with 25x25 splits) and training epochs took between 30 and 58 seconds in 4 different runs (4 days of about 3 hours of training each one).
+Our first tests with few images and epochs showed that the model could learn more details. Of course, that had a cost: both the train and the validation (test) batch size had to be divided by 4 to avoid a memory overflow. We decided to go ahead with a training with parameters as close to the instance norm baseline training:
+
+Hyperparameter | Value
+-------------- | -----
+Epochs | 900
+Learning Rate | 0.0002
+Lambda | 100
+Training images | 135 full sized
+Validation images | 30 full sized
+Batch Size | 4
+Test batch size | 2
+Normalization Layer | Instance
+Resize | 512
+Avg Time per Epoch | 30/58 seconds depending on run
+Total time to completion | 13h in Google Colab (4 runs)
 
 The training showed that the shapes of the avg. PSNR and the losses could be similar to those of our baseline trainings, being the avg. PSNR slightly higher:
 
@@ -865,7 +947,7 @@ On one hand the buildings seem less defined than in the 256x256 baseline trainin
 
 Another strategy to improve the quality of the generated images could be replacing our L1 content loss by the [VGG loss](https://paperswithcode.com/method/vgg-loss). The VGG loss was first proposed in [super resolution GANs](https://arxiv.org/pdf/1609.04802.pdf) with the intention of overcoming the blurriness provoked by pixel-wise loss functions such as MSE or MAE. As explained in the paper, L1 or L2 losses consider pixels as individual elements not belonging to any pattern, oversmoothing textures.
 
-To calculate the VGG loss, a VGG model pretrained on ImageNet classification is used. In the generator training phase, the L1 loss used to compare the generated satellite image and the ground truth satellite image is substituted by a comparison between the classification labels issued by the VGG model between the same both satellite images (generated and GT). The inctuition behind this is that if both images are similar, the labels and confidence scores resulting from the inference of the VGG network will also be similar.
+To calculate the VGG loss, a VGG19 model pretrained on ImageNet classification is used. Only the convolutional layers from the pretrained VGG19 are used. Both the generated satellite image and the ground truth satellite image are fed into the model separatedly. An L1 loss is computed comparing the feature maps issued from each image. The inctuition behind this is that if both images are similar, the feature maps infered by the model (which are prior to the classification layers) will also be similar.
 
 We made several toy trainings to have a first evaluation of the performance of this approach. With only 21 city full sized images from Austin, Chicago and Vienna, we trained the model for 900 epochs with a learning rate of 0.0002 and batch normalization. We added the VGG loss to the existing content L1 loss (lambdaL1 * L1 + lambdaVGG * VGG). The lambdas allowed to give more weight to the content losses with respect to the loss coming from the discriminator. We played with both lambda values:
 
@@ -965,7 +1047,7 @@ XXX Update table XXX
 
 ![](images/20-FIDresults.png)
 
-We found that the FID obtained was consistent with our observings in many examples. The [baseline](#baselineresults) (328.378) performed better than the [generator alone test](#generatoraloneimages) (379,982), the [model trained with 512x512 images](#biggerimages) (398.007) and slightly better than the [instance normalisation baseline](#fullsizemaskswithinstancenorm) (332.123). But we don't agree with the lower FIDs obtained in the trainings with 2x2 splits (both [from scratch](#2x2maskwith2x2training) and [from the baseline](#frombaseline)). We're also surprised of such a low value of the [VGG alone model](#VGGalone) (232.636), as the quality of images are, for us, comparable to those from the [baseline](#baselineresults) or the [instance normalisation baseline](#fullsizemaskswithinstancenorm).
+We found that the FID obtained was consistent with our observings in many examples. The [baseline](#baselineresults) (328.378) performed better than the [generator alone test](#generatoraloneimages) (379,982), the [model trained with 512x512 images](#biggerimages) (398.007) and slightly better than the [instance normalisation baseline](#fullsizemaskswithinstancenorm) (332.123). But we don't agree with the lower FIDs obtained in the trainings with 2x2 splits (both [from scratch](#2x2maskwith2x2training) and [from the baseline](#frombaseline)). We're also surprised of such a low value of the [VGG alone model](#VGGalone) (232.636), as the quality of images are, for us, comparable to those from the [baseline](#baselineresults) or the [instance normalisation baseline](#fullsizemaskswithinstancenorm). The lack of a big test dataset reduces the reliability of the FID, and that's our case.
 
 We used an [implementation](https://github.com/mseitzer/pytorch-fid) simple to install through pip and easy to use.
 
@@ -1014,31 +1096,21 @@ Anyway, it's been a great experience trying to adapt a well known model to a spe
 
 <p align="right"><a href="#toc">To top</a></p>
 
+
+
 # Next steps <a name="next_steps"></a>
 
-The lack of time prevented us from trying some more ideas in our quest for obtaining more detailed images. Here we propose a list of potential research path that could be followed through in order to improve output quality. Some of them are based on weaknesses spotted in the model and other are just alternative ways truncated by early decisions in our strategy.
+The lack of time prevented us from trying some more ideas in our quest for obtaining more detailed images. Here we propose a list of potential research paths that could be followed through in order to improve output quality. Some of them are based on weaknesses spotted in the model and other are just alternative ways truncated by early decisions in our strategy.
 
-We didn't try to substitute the original inner ResNet blocks with pretrained ones. We wonder if that would help the training and avoiding the color effects we suffered.
+- **Alternative implementations**: we sticked to a pix2pix model, but many other variants of GANs could be tried:
+    - [CycleGAN](https://junyanz.github.io/CycleGAN/)
+    - [Contrastive Unpaired Translation](https://github.com/taesungp/contrastive-unpaired-translation)
+    - [Super resolution GANs](https://arxiv.org/pdf/1609.04802.pdf)
+    - [Progressive growing GAN](https://arxiv.org/pdf/1710.10196.pdf)
 
-We sticked to a pix2pix model, but many other variants of GANs could be tried:
-- [CycleGAN](https://junyanz.github.io/CycleGAN/)
-- [Contrastive Unpaired Translation](https://github.com/taesungp/contrastive-unpaired-translation)
-- [Super resolution GANs](https://arxiv.org/pdf/1609.04802.pdf)
-- [Progressive growing GAN](https://arxiv.org/pdf/1710.10196.pdf)
-
-XXX ReduceLROnPlateau
-
-
-
-- **Alternative implementations**:
-    - CycleGAN
-    - Contrastive Unpaired Translation
-    - Super resolution GANs
-    - Progressive growing GAN
-
-- **LR_scheduler strategy**: describe our brief experimentation regarding the scheduler and how this might help get out of local minima.
+- **LR_scheduler strategy**: all of our trainings used the default LambdaLR, except for some tests with [ReduceLROnPlateau](#plateau) based on the losses, which didn't work out. Trying other schedulers or different parametrizations for them (for example, ReduceLROnPlateau configured to maximize the PSNR) might help to get out of local minima.
 - **Data augmentation for masks**. More variety of masks per ground-truth image and higher detail content per mask. Mask are very simplistic with an overall lack of detailing. Training a generative model to create higher quality mask using the original test images could open a new line of investigation. 
 - **Fine tuning pixel ratio/pixel density for image filter**. Our original value of 0.25 was choosen pretty randomly. Thus a need for finer selection could weed out problematic masks (high non-labelled are per picture). As the saying goes: ‘You cannot get something out of nothing’.
-- **Improve upscale layers** to reduce/eliminate checkerboard effects that have contaminated practically all results. Even though Instance Normilization handled most of this issues pretty well, a deeper understanding might be needed. Upscale convolutional layers are causing this effect and alternatives could be helpful to completely erase its nature.
+- **Improve upscale layers** to reduce/eliminate checkerboard effects that have contaminated practically all results. Even though Instance Normalization handled most of this issues pretty well, a deeper understanding might be needed. Upscale convolutional layers are causing this effect and alternatives could be helpful to completely erase its nature.
 - **Embed extra information to binary mask**, aiding the model to learn/map shapes to actual colors and objects. This could be a segmentation mask adding object labels or adding color-based information to the binary mask.
 - **Transfer learning**. Given the absence of a huge dataset, random initialization might not be enough to get the model out of local minima. Training curves notoriously showed plateaus from which the model could not escape. Searching for pre-trained implementations with valuable parameters could further increase chances of obtaining higher quality results. At the beginning of the project, it was evaluated the option of implementing pre-trained ResNet blocks but discarded for time-constrain reasons.
