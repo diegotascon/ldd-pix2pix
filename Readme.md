@@ -24,7 +24,7 @@ Advised by professor [Eva Mohedano](https://www.linkedin.com/in/eva-mohedano-261
     3. [Finding the right parameters](#parameters)
     4. [Does the discriminator help?](#nodiscriminator)
 6. [The quest for improving the results](#improvingresults)
-    1. [Changing the resolution of images](#changeresolution)
+    1. [Increasing the pixel resolution of images](#increaseresolution)
         1. [Resolutions](#resolutions)
         2. [Mid resolution](#midresolution)
         3. [High resolution](#highresolution)
@@ -136,28 +136,36 @@ For further explanation of the PSNR formula, refer to the following [article](ht
 Our first steps with the chosen implementation were to understand it, compare it with the original pix2pix implementation and prepare a [Colab notebook](colab_notebooks/01_TrainOriginalImages.ipynb) to test the code. We incorporated access to our Google Drive account, logging to Tensorboard and basic debugging outputs.
 
 ## 5.ii. Accessing the dataset <a name="datasetaccess"></a>
-Understanding how to access the dataset was crucial. We followed the recommendations from [this article](https://towardsdatascience.com/preparing-tiff-images-for-image-translation-with-pix2pix-f56fa1e937cb) to discover that the TIFF masks had only one channel and their values were held in a [0:255] range, as PNG or JPEG images. Moreover, the picked implementation transformed the images, both satellite ones and masks, to RGB (adding 2 channels to the masks), so we didn't have to treat the dataset in a special way.
+Understanding how to access the dataset was crucial. We followed the recommendations from [this article](https://towardsdatascience.com/preparing-tiff-images-for-image-translation-with-pix2pix-f56fa1e937cb) to discover that the TIFF masks had only one channel and their values were held in a [0:255] range, as PNG or JPEG images. Moreover, the picked implementation converted the read images, both satellite ones and masks, to RGB (adding 2 channels to the masks), so we didn't have to treat the dataset in a special way. The images are then resized to 286x286, transformed into a tensor, their values get normalized, a random 256x256 crop is performed and in half of the times they're flipped.
 
 After feeling confortable with short trainings (10 or 20 epochs, 20 images) we started to make longer ones (300 epochs, 115 images), and that revealed a weakness of our model: every epoch could take up to 6 minutes. That resulted in 30 hours of training. Soon, Colab started complaining about our abuse of GPU usage. So we had to make something about it.
 
-The dataset class [DatasetFromFolder](dataset.py) read the 72MB satellite image and the 1MB corresponding mask in every epoch, converted to RGB, resized them to 286x286 images, transformed them to a torch tensor, normalized their values, made a 256x256 random crop and a random flip. Most of that work could be done previously and only once. So we made a [script](transform-dataset.py) to pretransform all the masks and images to 286x286 with normalized values and save them to .npy numpy array files. We also adapted the DatasetFromFolder class to read the new files, transform them into torch tensors to random crop and random flip them. A training epoch then lasted only 13 seconds!
-
-_Note: in fact, pytorch tensors could be saved directly into .pt files and save some more CPU. When we realized it was possible, most of our research was already done, so we didn't try it. The savings are minimal. Once read from disk, we store the already transformed pytorch tensors in memory, so from epoch 2 no access to disk is done (except for TensorBoard and checkpoints)._
+The dataset class [DatasetFromFolder](dataset.py) reads every 72MB satellite image and its 1MB corresponding mask once in every epoch. Every read image and mask is transformed as explained before. Most of that work could be done prior to the training in only one run. So we made a [script](transform-dataset.py) to pretransform all the masks and images to 286x286 with normalized values and save them to .npy numpy array files. We also adapted the DatasetFromFolder class to read the new files, transform them into torch tensors to random crop and random flip them. A training epoch then lasted only 13 seconds!
 
 <img src="images/05-PretransformImages.png" width=50%>
 
+As we had enough CPU memory, we also stored all the 286x286 tensors in memory in the first epoch. In following epochs only the random operations are done, saving some extra seconds of processing.
+
+_Note: in fact, pytorch tensors could be saved directly into .pt files and save some more CPU. When we realized it was possible, most of our research was already done, so we didn't try it. As the pytorch tensers are saved into memory, no access to disk is done from epoch 2, except for TensorBoard savings and checkpoints._
+
+As the dataset was composed of 5 equally sized groups of images coming from 5 different cities, we manually split the dataset into train, validation and test subsets. This way we assured that every city was equally represented in every training. So we used 135 images (27 from each city) for training, 30 for validation and 15 for test.
+
 <p align="right"><a href="#toc">To top</a></p>
 
+
+
 ## 5.iii. Finding the right parameters <a name="parameters"></a>
-Once we were able to train 900 epochs in down to 3 hours having 135 images for training (27 from each city) and 30 for validating, we started to run different trainings in order to understand the influence of the chosen parameters and find a good combination of them.
+Once we were able to train 900 epochs in down to 3 hours we started to run different trainings in order to understand the influence of the chosen parameters and find a good combination of them.
 
 We began playing with the learning rate and the lambda, leaving untouched other possibilities like the learning rate policy. We left untouched also parameters that affected the structure of the model like the type of normalization or the number of filters in the first convolutional layer.
 
 The losses from both the generator and the discriminator served us as a guide to what was happening with the model. Plus, in every epoch an average [PSNR](https://en.wikipedia.org/wiki/Peak_signal-to-noise_ratio) is calculated using the validation images.
 
-We started rising the original learning rate of 0.0002 to 0.002 trying to boost the learning process, but that collapsed the training: the generator only produced blank images. A too high learning rate was probably exploding gradients. The avg PSNR acted as a canary of the moment the training collapsed:
+We started rising the original learning rate of 0.0002 to 0.002 trying to boost the learning process, but that collapsed the training: the generator only produced blank images. A too high learning rate was probably exploding gradients. As you can see in the plot below, the model collapsing can be easily identified on the learning curve by an abrupt decease of the PSNR, which acted as a canary in a mine for us:
 
 <img src="images/06-CollapsedPSNR.png" width=49%>
+
+_Figure 1: avg PSNR when training the model with a LR of 0.002_
 
 Other values tested for the learning rate (0.0001, 0.0003, 0.001) didn't improve the quality of the obtained images. That wasn't he case of the lambda.
 
@@ -165,21 +173,31 @@ We found that the lambda had a bigger influence in the capacity of the model to 
 
 <img src="images/06-FlatLosses.png">
 
+_Figure 2: loss plots for the discriminator (left) and generator (right) when training with a lambda value of 10. Both curves show the total loss of the model across the epochs_
+
 On the other hand, larger lambda values of 25, 50 and 100 helped the model to improve the quality of images proportionally to the number of epochs:
 
 <img src="images/06-ProgressingLosses.png">
 
-Regarding losses we found that even if the discriminator's loss rised a bit, if the generator's loss descended in a continuos manner then the quality of the images produced would be better. The avg. PSNR hadn't any correspondance with the perceptual quality of images. The PSNR tended to peak between epoch 100 and 200 in different trainings and the images produced in those stages were just horrible:
+_Figure 3: loss plots for the discriminator (left) and generator (right) when training with a lambda value of 100_
+
+Those labmda values made the discriminator's loss rise a bit and the generator's loss descended in a continuos manner. That could mean that giving more weight to the content loss with regard to the loss coming from the discriminator helped the model learn better. So minimizing the generator's loss revealed as our best target to obtain quality images.
+
+The avg. PSNR hadn't any correspondance with the perceptual quality of images. As show in figure 4, the PSNR tended to peak between epoch 100 and 200 in different trainings, but the images produced in those stages were just horrible:
 
 <img src="images/06-BaselinePSNR.png" width="50%">
+
+_Figure 4: avg PSNR plot in a training of 900 epochs. This is the typical shape obtained in every training_
 
 In the following images it can be appreciated that the longer the training, the better the images, despite what could be deduced from the PSNR graphs. On the left the labelled mask is shown while on the right the generated image (from the training set) is shown in epoch 400:
 
 <img src="images/06-TestImageEpoch400.png">
 
-...and in epoch 900:
+_Figure 5: control images from the training set saved in TensorBoard in epoch 400. The labelled mask on the left is fed into the generator, which outputs the forged image on the right_
 
 <p><img src="images/06-TestImageEpoch900.png"></p>
+
+_Figure 6: control images from the training set saved in epoch 900_
 
 In the following table you can see the hyperparameters we played with and some comments about their values:
 
@@ -195,36 +213,38 @@ Lambda | 25, 50, 100 | High lambda values helped the model learn the dataset det
 Epochs | 900 | This value gave us a good compromise between quality results and spent resources
 Epochs | 200, 500 | Lower epochs helped us to see trends, but the quality of the images obtained was low
 
-So we found that a LR of 0.0002, lambda 100 and training for 900 epochs a set of 135 images (27 per city) generated reasonable decent images with our test masks. Thus, we considered it our baseline model:
+So we found that a LR of 0.0002, lambda 100 and training for 900 epochs generated reasonable decent images with our test masks. Thus, we considered it our **baseline model**:
 
 <a name="baselineresults"></a>
-<div id="baselineresults">
-    Masks for Austin29, Chicago29, Kitsap29, Tyrol-w29 and Vienna29:
-    <div id="fullmaskbaseline">
-        <img src="images/NoSplitLR0.0002-Lambda100/MaskResized-austin29.jpeg" width=19%>
-        <img src="images/NoSplitLR0.0002-Lambda100/MaskResized-chicago29.jpeg" width=19%>
-        <img src="images/NoSplitLR0.0002-Lambda100/MaskResized-kitsap29.jpeg" width=19%>
-        <img src="images/NoSplitLR0.0002-Lambda100/MaskResized-tyrol-w29.jpeg" width=19%>
-        <img src="images/NoSplitLR0.0002-Lambda100/MaskResized-vienna29.jpeg" width=19%>
-    </div>
-    Generated images:
-    <div id="baselinesgenerated">
-        <img src="images/NoSplitLR0.0002-Lambda100/Generated-austin29.jpeg" width=19%>
-        <img src="images/NoSplitLR0.0002-Lambda100/Generated-chicago29.jpeg" width=19%>
-        <img src="images/NoSplitLR0.0002-Lambda100/Generated-kitsap29.jpeg" width=19%>
-        <img src="images/NoSplitLR0.0002-Lambda100/Generated-tyrol-w29.jpeg" width=19%>
-        <img src="images/NoSplitLR0.0002-Lambda100/Generated-vienna29.jpeg" width=19%>
-    </div>
-    Ground truth satellite images:
-    <div id="validationgt">
-        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-austin29.jpeg" width=19%>
-        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-chicago29.jpeg" width=19%>
-        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-kitsap29.jpeg" width=19%>
-        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-tyrol-w29.jpeg" width=19%>
-        <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-vienna29.jpeg" width=19%>
-    </div>
+<div id="fullmaskbaseline">
+    <img src="images/NoSplitLR0.0002-Lambda100/MaskResized-austin29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002-Lambda100/MaskResized-chicago29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002-Lambda100/MaskResized-kitsap29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002-Lambda100/MaskResized-tyrol-w29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002-Lambda100/MaskResized-vienna29.jpeg" width=19%>
 </div>
-<p></p>
+
+_Figure 7: test labelled masks from Austin, Chicago, Kitsap county, Tyrol and Vienna (from left to right)_
+
+<div id="baselinesgenerated">
+    <img src="images/NoSplitLR0.0002-Lambda100/Generated-austin29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002-Lambda100/Generated-chicago29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002-Lambda100/Generated-kitsap29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002-Lambda100/Generated-tyrol-w29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002-Lambda100/Generated-vienna29.jpeg" width=19%>
+</div>
+
+_Figure 8: generated images from the baseline model using test masks_
+
+<div id="validationgt">
+    <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-austin29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-chicago29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-kitsap29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-tyrol-w29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002-Lambda100/OriginalResized-vienna29.jpeg" width=19%>
+</div>
+
+_Figure 9: ground truth satellite images corresponding to test masks in figure 7_
 
 In general, the model performs acceptably well when the mask is almost full of annotated buildings. Few checkerboard effects are shown. In masks with big empty non labelled spaces (woods, large roads, ...) it defaults to a mixture of grey (for roads) and green (for trees) unshaped forms.
 
@@ -232,11 +252,9 @@ In general, the model performs acceptably well when the mask is almost full of a
 
 ## 5.iv. Does the discriminator help? <a name="nodiscriminator"></a>
 
-Once we had a working cGAN, a question arose: if we're just trying to map images from one domain (labelled masks) to another (satellite images), does the extra burden of having a discriminator pay off? Papers tell so, but we made a test to prove it with our dataset. So we [built a model](model_variations/generator_alone) removing the discriminator. As a loss we left the L1 * lambda content loss, which compared the generated image with the ground truth. We trained the model with the same parameters as the previous one: 900 epochs, a learning rate of 0.0002, lambda of 100. We used our [Google Cloud instance](gcinstance) to train, which lasted 04:27:43 for less than 1€.
+Once we had a working cGAN, a question arose: if we're just trying to map images from one domain (labelled masks) to another (satellite images) and the generator's loss has a bigger influence in the capacity of the model to learn, does the extra burden of having a discriminator pay off? Papers tell so, but we made a test to prove it with our dataset. So we [built a model](model_variations/generator_alone) removing the discriminator. As a loss we left the L1 * lambda content loss, which compared the generated image with the ground truth. We trained the model with the same parameters as the previous one: 900 epochs, a learning rate of 0.0002, lambda of 100. We used our [Google Cloud instance](#gcinstance) to train, which lasted 04:27:43 for less than 1€.
 
 The metrics showed similar to the previous training, with a higher final PSNR and a lower loss:
-
-<img src="images/08-generatoralonePSNR.png" width="48%"> <img src="images/08-generatoraloneloss.png" width="49%">
 
 Generating images with the validation masks, though, showed worse perceptual results. Both buildings and non-labelled areas appear less defined, and even some of the images show fluorescent colors:
 
@@ -249,15 +267,28 @@ Generating images with the validation masks, though, showed worse perceptual res
     <img src="images/NoSplit-GeneratorAlone-FullSize/Generated-vienna29.jpeg" width=19%>
 </div>
 
+_Figure 10: generated images with a model without discriminator_
+
+<div id="baselinesgenerated">
+    <img src="images/NoSplitLR0.0002-Lambda100/Generated-austin29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002-Lambda100/Generated-chicago29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002-Lambda100/Generated-kitsap29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002-Lambda100/Generated-tyrol-w29.jpeg" width=19%>
+    <img src="images/NoSplitLR0.0002-Lambda100/Generated-vienna29.jpeg" width=19%>
+</div>
+
+_Figure 11: generated images from the baseline model using test masks from figure 7_
+
 As a conclusion, the discriminator really helps improving the quality of the generated images at a relatively low cost.
 
 <p align="right"><a href="#toc">To top</a></p>
 
 
+
 # 6. The quest for improving the results <a name="improvingresults"></a>
 With a LR of 0.0002 and a lambda of 100 we had a good baseline to improve the results. Many options were at hand:
 
-- Changing the resolution of the training images would allow the model to learn more detailed information from the satellite pictures: cars, trees, ...
+- Increasing the pixel resolution of the training images would allow the model to learn more detailed information from the satellite pictures: cars, trees, ...
 - Using a different network normalization, like using [instance normalization](https://medium.com/syncedreview/facebook-ai-proposes-group-normalization-alternative-to-batch-normalization-fb0699bffae7) instead of batch normalization
 - Focusing on labelled areas: filtering masks based on pixel content and grouping images on label density
 - Using a different regularization content loss, like [VGG Loss](https://paperswithcode.com/method/vgg-loss), to let the model learn a more perceptual similarity generation
@@ -265,15 +296,17 @@ With a LR of 0.0002 and a lambda of 100 we had a good baseline to improve the re
 
 <p align="right"><a href="#toc">To top</a></p>
 
-## 6.i. Changing the resolution of images <a name="changeresolution"></a>
+
+
+## 6.i. Increasing the pixel resolution of images <a name="increaseresolution"></a>
 
 The results obtained in our best trainings were far from detailed. The model is originally conceived to receive and produce 256x256 images and we trained it with resized 286x286 images from the 5000x5000 originals. That meant we were reducing by 306 times the area of original images and masks. It also meant that if the original satellite images had a resolution of 0.3 meters per pixel, when resized to 286x286 the resolution changed to 5.25 m/px, loosing a lot of detail along the way.
 
-To diminish the resolution loose we tried two strategies: splitting the images and resizing to a bigger size.
+To diminish the resolution loss we tried two strategies: splitting the images and resizing to a bigger size.
 
-So we made up two new datasets splitting the original images and masks into smaller squares. In one of them, from a couple of a 5000x5000 image and mask, we obtained 25 1000x1000 images and masks. Resizing them to 286x286 resulted in images with a resolution of 1.05 m/px, which we hoped would help the model to learn more details from the images (at the cost of having 25 times more images to process). The new dataset was also resized and normalized, as explained [before](#datasetaccess). The second dataset performed the same operation dividing all the images by 2x2, obtaining 4 2500x2500 tiles from each image and mask.
+For the first one we made up two new datasets splitting the original images and masks into smaller squares. In one of them, from every 5000x5000 image and mask we obtained 25 1000x1000 tiles. Resizing them to 286x286 resulted in images with a pixel resolution of 1.05 m/px, which we hoped would help the model to learn more details from the images (at the cost of having 25 times more images to process). The new dataset was also resized and normalized, as explained [before](#datasetaccess). In the second dataset performed the same operation dividing all the images by 2x2, obtaining 4 2500x2500 tiles from each image and mask.
 
-For the second strategy we prepared a new dataset resizing the original images and masks to 542x542.
+For the second strategy we prepared a new dataset resizing the original images and masks to 542x542, with no splitting.
 
 The following table briefs the datasets used throughout the tests:
 
@@ -285,9 +318,12 @@ Mid resolution 2x2 | 2.62 | 286x286 | 256x256 | 540 | 120
 Mid resolution full | 2.77 | 542x542 | 512x512 | 135 | 30
 High resolution 5x5 | 1.05 | 286x286 | 256x256 | 3375 | 750
 
+The low resolution dataset is the one already used in our [first trainings](#parameters).
+
 When using the high resolution dataset, 25 times more images would mean spending 5 minutes and a half for every epoch. That is 9 hours for 100 epochs in Google Colab, way too much for the limits the free platform offers. So we decided to create a Google Cloud instance to overcome the usage limits of Colab. More details about the instance can be found in a [later section](#gcinstance).
 
 <p align="right"><a href="#toc">To top</a></p>
+
 
 
 
@@ -296,141 +332,121 @@ When using the high resolution dataset, 25 times more images would mean spending
 #### From scratch 
 As a first test we used the Mid resolution 2x2 dataset. We spent some time to find the best combination of parameters for speed (data loader threads, batch and validation batch sizes) in the Google Cloud instance. A surprise was awaiting: if we could train our baseline model on Colab spending 13 seconds per epoch, we expected to obtain around 52 sec/epoch with 540 couples, but instead every epoch lasted 97 seconds in our new shining cloud environment. We made a 900 epoch training anyway, which lasted almost 25 hours at a cost of around 16€.
 
-Although the intermediate results recorded in tensorboard were promising, the validation images generated showed color problems. We generated two sets of images: one feeding the whole mask to produce a single 256x256 image:
-
-<a name="fullmaskwith2x2training"></a>
-<div id="fullmaskwith2x2training">
-    Generated images:
-    <div id="fullmaskwith2x2traininggenerated">
-        <img src="images/Split2x2-fullsize/Generated-austin29.jpeg" width=19%>
-        <img src="images/Split2x2-fullsize/Generated-chicago29.jpeg" width=19%>
-        <img src="images/Split2x2-fullsize/Generated-kitsap29.jpeg" width=19%>
-        <img src="images/Split2x2-fullsize/Generated-tyrol-w29.jpeg" width=19%>
-        <img src="images/Split2x2-fullsize/Generated-vienna29.jpeg" width=19%>
-    </div>
-    Ground truth satellite images:
-    <div id="fullmaskwith2x2trainingvalidation">
-        <img src="images/Split2x2-fullsize/OriginalResized-austin29.jpeg" width=19%>
-        <img src="images/Split2x2-fullsize/OriginalResized-chicago29.jpeg" width=19%>
-        <img src="images/Split2x2-fullsize/OriginalResized-kitsap29.jpeg" width=19%>
-        <img src="images/Split2x2-fullsize/OriginalResized-tyrol-w29.jpeg" width=19%>
-        <img src="images/Split2x2-fullsize/OriginalResized-vienna29.jpeg" width=19%>
-    </div>
-</div>
-<p></p>
-
-In the second set we split the mask into 4 tiles, resizing them to 256x256. Thus we generated 4 256x256 splits for every image. The color problems also showed up in that case.
+Although the intermediate results recorded in tensorboard were promising, the validation images generated showed color problems:
 
 <a name="2x2maskwith2x2training"></a>
-<div id="2x2maskwith2x2training">
-    Masks:
-    <div id="2x2masks">
-        <div>
-            <img src="images/Split2x2-2x2/MaskResized-austin29-1.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/MaskResized-austin29-3.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/MaskResized-chicago29-1.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/MaskResized-chicago29-3.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/MaskResized-kitsap29-1.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/MaskResized-kitsap29-3.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/MaskResized-tyrol-w29-1.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/MaskResized-tyrol-w29-3.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/MaskResized-vienna29-1.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/MaskResized-vienna29-3.jpeg" width=9%>
-        </div>
-        <div>
-            <img src="images/Split2x2-2x2/MaskResized-austin29-2.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/MaskResized-austin29-4.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/MaskResized-chicago29-2.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/MaskResized-chicago29-4.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/MaskResized-kitsap29-2.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/MaskResized-kitsap29-4.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/MaskResized-tyrol-w29-2.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/MaskResized-tyrol-w29-4.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/MaskResized-vienna29-2.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/MaskResized-vienna29-4.jpeg" width=9%>
-        </div>
+<div id="2x2masks">
+    <div>
+        <img src="images/Split2x2-2x2/MaskResized-austin29-1.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/MaskResized-austin29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/MaskResized-chicago29-1.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/MaskResized-chicago29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/MaskResized-kitsap29-1.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/MaskResized-kitsap29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/MaskResized-tyrol-w29-1.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/MaskResized-tyrol-w29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/MaskResized-vienna29-1.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/MaskResized-vienna29-3.jpeg" width=9%>
     </div>
-    Generated images:
-    <div id="2x2maskwith2x2traininggenerated">
-        <div>
-            <img src="images/Split2x2-2x2/Generated-austin29-1.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/Generated-austin29-3.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/Generated-chicago29-1.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/Generated-chicago29-3.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/Generated-kitsap29-1.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/Generated-kitsap29-3.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/Generated-tyrol-w29-1.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/Generated-tyrol-w29-3.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/Generated-vienna29-1.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/Generated-vienna29-3.jpeg" width=9%>
-        </div>
-        <div>
-            <img src="images/Split2x2-2x2/Generated-austin29-2.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/Generated-austin29-4.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/Generated-chicago29-2.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/Generated-chicago29-4.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/Generated-kitsap29-2.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/Generated-kitsap29-4.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/Generated-tyrol-w29-2.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/Generated-tyrol-w29-4.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/Generated-vienna29-2.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/Generated-vienna29-4.jpeg" width=9%>
-        </div>
-    </div>
-    Ground truth satellite images:
-    <div id="2x2maskwith2x2trainingvalidation">
-        <div>
-            <img src="images/Split2x2-2x2/OriginalResized-austin29-1.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/OriginalResized-austin29-3.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/OriginalResized-chicago29-1.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/OriginalResized-chicago29-3.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/OriginalResized-kitsap29-1.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/OriginalResized-kitsap29-3.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/OriginalResized-tyrol-w29-1.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/OriginalResized-tyrol-w29-3.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/OriginalResized-vienna29-1.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/OriginalResized-vienna29-3.jpeg" width=9%>
-        </div>
-        <div>
-            <img src="images/Split2x2-2x2/OriginalResized-austin29-2.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/OriginalResized-austin29-4.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/OriginalResized-chicago29-2.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/OriginalResized-chicago29-4.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/OriginalResized-kitsap29-2.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/OriginalResized-kitsap29-4.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/OriginalResized-tyrol-w29-2.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/OriginalResized-tyrol-w29-4.jpeg" width=9%>
-            &nbsp;
-            <img src="images/Split2x2-2x2/OriginalResized-vienna29-2.jpeg" width=9%>
-            <img src="images/Split2x2-2x2/OriginalResized-vienna29-4.jpeg" width=9%>
-        </div>
+    <div>
+        <img src="images/Split2x2-2x2/MaskResized-austin29-2.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/MaskResized-austin29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/MaskResized-chicago29-2.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/MaskResized-chicago29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/MaskResized-kitsap29-2.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/MaskResized-kitsap29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/MaskResized-tyrol-w29-2.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/MaskResized-tyrol-w29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/MaskResized-vienna29-2.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/MaskResized-vienna29-4.jpeg" width=9%>
     </div>
 </div>
 
-For the sake of comparison, we generated 2x2 tiles with our baseline model using the same validation masks and found that one of the Vienna29 (rightmost) tiles already showed a fluorescent effect:
+_Figure 12: test labelled masks from Austin, Chicago, Kitsap county, Tyrol and Vienna (from left to right) for the Mid resolution 2x2 dataset_
+
+<div id="2x2maskwith2x2traininggenerated">
+    <div>
+        <img src="images/Split2x2-2x2/Generated-austin29-1.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/Generated-austin29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/Generated-chicago29-1.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/Generated-chicago29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/Generated-kitsap29-1.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/Generated-kitsap29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/Generated-tyrol-w29-1.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/Generated-tyrol-w29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/Generated-vienna29-1.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/Generated-vienna29-3.jpeg" width=9%>
+    </div>
+    <div>
+        <img src="images/Split2x2-2x2/Generated-austin29-2.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/Generated-austin29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/Generated-chicago29-2.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/Generated-chicago29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/Generated-kitsap29-2.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/Generated-kitsap29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/Generated-tyrol-w29-2.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/Generated-tyrol-w29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/Generated-vienna29-2.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/Generated-vienna29-4.jpeg" width=9%>
+    </div>
+</div>
+
+_Figure 13: generated images from the test masks in figure 12 using the model trained with the Mid resolution 2x2 dataset from scratch_
+
+<div id="2x2maskwith2x2trainingvalidation">
+    <div>
+        <img src="images/Split2x2-2x2/OriginalResized-austin29-1.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/OriginalResized-austin29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/OriginalResized-chicago29-1.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/OriginalResized-chicago29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/OriginalResized-kitsap29-1.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/OriginalResized-kitsap29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/OriginalResized-tyrol-w29-1.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/OriginalResized-tyrol-w29-3.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/OriginalResized-vienna29-1.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/OriginalResized-vienna29-3.jpeg" width=9%>
+    </div>
+    <div>
+        <img src="images/Split2x2-2x2/OriginalResized-austin29-2.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/OriginalResized-austin29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/OriginalResized-chicago29-2.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/OriginalResized-chicago29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/OriginalResized-kitsap29-2.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/OriginalResized-kitsap29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/OriginalResized-tyrol-w29-2.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/OriginalResized-tyrol-w29-4.jpeg" width=9%>
+        &nbsp;
+        <img src="images/Split2x2-2x2/OriginalResized-vienna29-2.jpeg" width=9%>
+        <img src="images/Split2x2-2x2/OriginalResized-vienna29-4.jpeg" width=9%>
+    </div>
+</div>
+
+_Figure 14: ground truth satellite images corresponding to test masks in figure 12_
+
+For the sake of comparison, we generated 2x2 tiles with our baseline model using the same test masks in figure 12 and found that one of the Vienna (rightmost) tiles already showed a fluorescent effect:
 
 <a name="2x2maskwithbaselinetraining"></a>
 <div id="2x2maskwithbaselinetraining">
@@ -468,15 +484,19 @@ For the sake of comparison, we generated 2x2 tiles with our baseline model using
     </div>
 </div>
 
+_Figure 15: generated images from the test masks in figure 12 using the baseline model_
+
 Some checkerboard effects can also be seen when generating from big empty (non-labelled) spaces.
 
 For some reason, the model had a tendency to saturate colors from the zoomed in satellite images, something we didn't observe when full images were used. If the already trained baseline model had learnt appropiate colors, perhaps further training it with the new dataset will allow it to learn the details without loosing the color scheme.
 
 <p align="right"><a href="#toc">To top</a></p>
 
+
+
 #### Training mid resolution from baseline <a name="frombaseline"></a>
 
-To avoid the color effects when training with the mid resolution 2x2 dataset from scratch, we tried several trainings loading the already pretrained baseline model (where the low resolution dataset was used). To obtain a quick glimpse on whether the path taken could offer good results, we used a reduced dataset of 140 tiles (28 tiles from each city) and only 200 epochs. Colors suffered from saturation as in the previous training:
+To avoid the color effects when training with the Mid resolution 2x2 dataset from scratch, we tried several trainings loading the already pretrained baseline model (where the low resolution dataset was used). To obtain a quick glimpse on whether the path taken could offer good results, we used a subset of 140 tiles (28 tiles from each city) and only 200 epochs. Colors suffered from saturation as in the previous training:
 
 <div id="2x2batchnormfrombaseline">
     <div>
@@ -513,77 +533,86 @@ To avoid the color effects when training with the mid resolution 2x2 dataset fro
     </div>
 </div>
 
+_Figure 16: generated images from the test masks in figure 12 after 200 epochs of training of the baseline model with the Mid resolution 2x2 dataset_
+
 A part from the saturated colors problem, more checkerboard effects can be seen even in dense city tiles when compared with the 2x2 tiles generated with the baseline model.
 
 At this point, we parallelized efforts to find a solution to color saturation. On one hand we tried changing the [normalization layer](#instancenorm) in the model as stated by some researchers. On the other hand we went on with the [high resolution dataset](#highresolution).
 
 <p align="right"><a href="#toc">To top</a></p>
 
+
+
 #### From low resolution with instance normalization to mid resolution
 
-As explained in a later [section](#instancenorm), we were successful correcting the saturation colors by training our model using instance normalization with our low resolution dataset. To make the model learn more details from the pictures, we launched a training with the aforementioned pretrained model using this time the mid resolution 2x2 dataset. As with our [batch normalization try](#frombaseline), a 140 tiles subset was used during 200 epochs.
+As explained in a later [section](#instancenorm), we were successful correcting the saturation colors by training our model using instance normalization with our Low resolution dataset. That became a second baseline for us, which we called instance norm baseline. From that moment on the models used in all parallel trainings were created with instance normalization substituting the batch normalization layers.
+
+To make the model learn more details from the pictures, we launched a training with the aforementioned pretrained instance norm baseline model using this time the Mid resolution 2x2 dataset. As with our [batch normalization try](#frombaseline), a 140 tiles subset was used during 200 epochs.
 
 The results showed that a change in the resolution of the images caused the model to relearn patterns. That was counter-intuitive for us, as many models use other pretrained models to take advantage of the already learnt features to obtain faster results.
 
 The images obtained were very similar to the control images we found in TensorBoard in early stages of the low resolution trainings. Thus it seemed there was no benefit from using a pretrained model and train it with zoomed-in images. Perhaps with more epochs the model could learn the extra details, but we doubted that this strategy was any better than training the model from scratch.
 
-Below you can see a comparison between the images obtained with the low resolution batch norm baseline model (left), the low resolution instance norm baseline (center) and the training try (right):
+Below you can see a comparison between the images obtained with the Low resolution batch norm baseline model (left), the Low resolution instance norm baseline (center) and the training try (right):
 
 <a name="2x2maskwithinstancenormbaselinetraining"></a>
-<div id="2x2maskwithinstancenormbaselinetraining">
-    <div>
-        Austin29
-        <div name="austin29up">
-            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-1.jpeg" width=15%>
-            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-3.jpeg" width=15%>
-            &nbsp;
-            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29-1.jpeg" width=15%>
-            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29-3.jpeg" width=15%>
-            &nbsp;
-            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-austin29-1.jpeg" width=15%>
-            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-austin29-3.jpeg" width=15%>
-        </div>
-        <div name="austin29down">
-            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-2.jpeg" width=15%>
-            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-4.jpeg" width=15%>
-            &nbsp;
-            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29-2.jpeg" width=15%>
-            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29-4.jpeg" width=15%>
-            &nbsp;
-            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-austin29-2.jpeg" width=15%>
-            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-austin29-4.jpeg" width=15%>
-        </div>
-        Chicago29
-        <div name="chicago29up">
-            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-1.jpeg" width=15%>
-            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-3.jpeg" width=15%>
-            &nbsp;
-            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29-1.jpeg" width=15%>
-            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29-3.jpeg" width=15%>
-            &nbsp;
-            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-chicago29-1.jpeg" width=15%>
-            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-chicago29-3.jpeg" width=15%>
-        </div>
-        <div name="chicago29down">
-            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-2.jpeg" width=15%>
-            <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-4.jpeg" width=15%>
-            &nbsp;
-            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29-2.jpeg" width=15%>
-            <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29-4.jpeg" width=15%>
-            &nbsp;
-            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-chicago29-2.jpeg" width=15%>
-            <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-chicago29-4.jpeg" width=15%>
-        </div>
+<div>
+    <div name="austin29up">
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-1.jpeg" width=15%>
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-3.jpeg" width=15%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29-1.jpeg" width=15%>
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29-3.jpeg" width=15%>
+        &nbsp;
+        <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-austin29-1.jpeg" width=15%>
+        <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-austin29-3.jpeg" width=15%>
+    </div>
+    <div name="austin29down">
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-2.jpeg" width=15%>
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-austin29-4.jpeg" width=15%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29-2.jpeg" width=15%>
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29-4.jpeg" width=15%>
+        &nbsp;
+        <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-austin29-2.jpeg" width=15%>
+        <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-austin29-4.jpeg" width=15%>
     </div>
 </div>
+
+_Figure1 17: 2x2 tiles generated from the test masks of Austin in figure 12 with 3 different models: baseline (left), instance norm baseline (center) and current training_
+
+<div>
+    <div name="chicago29up">
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-1.jpeg" width=15%>
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-3.jpeg" width=15%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29-1.jpeg" width=15%>
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29-3.jpeg" width=15%>
+        &nbsp;
+        <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-chicago29-1.jpeg" width=15%>
+        <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-chicago29-3.jpeg" width=15%>
+    </div>
+    <div name="chicago29down">
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-2.jpeg" width=15%>
+        <img src="images/NoSplitLR0.0002Lambda100-2x2experiment/Generated-chicago29-4.jpeg" width=15%>
+        &nbsp;
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29-2.jpeg" width=15%>
+        <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29-4.jpeg" width=15%>
+        &nbsp;
+        <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-chicago29-2.jpeg" width=15%>
+        <img src="images/Split2x2-fromInstanceNorm-200epochs-2x2/Generated-chicago29-4.jpeg" width=15%>
+    </div>
+</div>
+
+_Figure1 18: 2x2 tiles generated from the test masks of Chicago in figure 12 with 3 different models: baseline (left), instance norm baseline (center) and current training_
 
 <p align="right"><a href="#toc">To top</a></p>
 
 
 
-#### Training with the mid resolution 2x2 dataset from scratch
+#### Training with the Mid resolution 2x2 dataset from scratch
 
-Once we realized that training from a checkpoint where the resolution of images changed caused the model to almost start from the beginning relearning patterns, we decided to train the model with the mid resolution 2x2  dataset and instance normalisation from scratch. We hoped the model would learn more details with the this dataset while keeping good colors using instance normalisation.
+Once we realized that training from a checkpoint where the resolution of images changed caused the model to almost start from the beginning relearning patterns, we decided to train the model with the Mid resolution 2x2  dataset and instance normalisation from scratch. We hoped the model would learn more details with the this dataset while keeping good colors using instance normalisation.
 
 A summary table is presented including set-up definition and time-to-completion:
 
@@ -601,7 +630,7 @@ Total time to completion (h) | 26.5
 
 Below a 2x2 image grid is displayed for each city. Each 2 by 2 grid represents the original full-sized image.
 
-Regarding output quality, two positive results are clearly derived. Neither color issues nor checkerboard effects seem to be degrading model generation. XXX Contrary wise, blurriness and lack of detail has increased for this generative state XXX. On top of that, color allocation throughout all generated images is yet problematic, with an over-allocation of green colors covering most unlabeled areas.
+Regarding output quality, two positive results are clearly derived. Neither color issues nor checkerboard effects seem to be degrading model generation. **XXX Contrary wise, blurriness and lack of detail has increased for this generative state XXX**. On top of that, color allocation throughout all generated images is yet problematic, with an over-allocation of green colors covering most unlabeled areas.
 
 Several conclusions were extracted from these results.
 
@@ -645,6 +674,8 @@ Several conclusions were extracted from these results.
     </div>
 </div>
 
+_Figure 19: generated images from the test masks in figure 12 training from scratch with the Mid resolution 2x2 dataset_
+
 Loss curves and PSNR shapes resemble to those of the baseline model. Losses converge towards a minimum, while PSNR steadily decreases over epoch time. Contrary to this metric’s logic, control images saved at TensorBoard at epoch 100 are visibly worse than those saved at epoch 900.
 
 A new course of action was derived from this experiment: [filter out input masks based on pixel density](#labelfocus) XXX Explain hypothesis here XXX.
@@ -656,9 +687,9 @@ A new course of action was derived from this experiment: [filter out input masks
 
 #### Training with the mid resolution full
 
-Our chosen pix2pix implementation, in training time, resizes images to 286x286 and, from there, crops them to 256x256. So, the generator is trained to accept 256x256 masks and output 256x256 satellite alike images. One of the strategies to obtain more detailed images was using the mid resolution full dataset, where the original images were resized to 542x542. The dataloader was modified to obtain 512x512 crops from them. That meant every content layer of the model would use 4 times more space, which should lead the model to learn more details of the images.
+Our chosen pix2pix implementation, in training time, resizes images to 286x286 and, from there, crops them to 256x256. So, the generator is trained to accept 256x256 masks and output 256x256 satellite alike images. Another of the strategies to obtain more detailed images was using the Mid resolution full dataset, where the original images were resized to 542x542. The dataloader was modified to obtain 512x512 crops from them. That meant every content layer of the model would use 4 times more space, which should lead the model to learn more details of the images.
 
-We made some toy trainings with a sub-set of the images with few epochs, and the results were promising. We also witnessed that both the train and the validation (called test in the implementation) batch size had to be divided by 4 to avoid a memory overflow. As that was bearable, we decided to go ahead with a training with parameters as close to the [instance norm baseline](#instancenorm) training:
+We made some toy trainings with a subset of the images with few epochs, and the results were promising. We also witnessed that both the train and the validation (called test in the implementation) batch size had to be divided by 4 to avoid a memory overflow. As that was bearable, we decided to go ahead with a training with parameters as close to the [instance norm baseline](#instancenorm) training:
 
 Hyperparameter | Value
 -------------- | -----
@@ -686,7 +717,9 @@ The promises weren't kept. The images generated from test masks showed that the 
     <img src="images/NoSplit542-fullsize/Generated-vienna29.jpeg" width=19%>
 </div>
 
-Comparing with [instance normalization baseline](#instancenorm) low resolution generations:
+_Figure 20: generated images from test masks shown in figure 7 with a model trained with the Mid resolution full dataset_
+
+Comparing with [instance normalization baseline](#instancenorm) Low resolution generations (explained in a future section):
 
 <div id="fullsizemaskswithinstancenorm">
     <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29.jpeg" width=19%>
@@ -695,6 +728,8 @@ Comparing with [instance normalization baseline](#instancenorm) low resolution g
     <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-tyrol-w29.jpeg" width=19%>
     <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-vienna29.jpeg" width=19%>
 </div>
+
+_Figure 21: generated images from test masks in Figure 7 with the instance norm baseline model_
 
 On one hand the buildings seem less defined than in the low resolution training. On the other, the non-labelled areas suffer from a much less realistic mix of green and grey forms (trees and roads). As a positive outcome, no checkerboard effect is appreciated. We thought that perhaps using bigger images requires more epochs to let the model capture high frequency details. We gave it a try with 1200 epochs, but no improvement was appreciated.
 
@@ -737,6 +772,8 @@ Kytsap | ![](images/Split5x5/Kytsap.png)
 Tyrol-w | ![](images/Split5x5/Tyrol-w.png)
 Vienna | ![](images/Split5x5/Vienna.png)
 
+_Figure 22: generated samples from masks of the High resolution dataset for 5 different cities_
+
 Cropping images to augment the resolution and increasing the dataset did resolve into a very outstanding improvement in image generation. The model is capable of identifying more complex objects such as tree cups and forests, roofs, building blocks. There are even some blue dots resembling of swimming pools! Particularly impressive is the nuances in some Chicago images where the model tried to paint some skyscraper shadows, which automatically increases realism in an image! But not all are roses and diamonds. Checkerboard effects and color issues are yet slightly prominent. Good news is that the majority of them are taking place, once again, for those rural/forestry landscapes. The model struggles to hallucinate correct shapes and colors when there is barely input information.
 
 In light of these results, it can be asserted that augmenting the dataset by cropping the images to increment their resolution seems to be a very effective measure for increasing generation quality. However, in order to fight some issues regarding checkerboard effects and color allocation, as well as to stay loyal to our crusade of increasing quality as much as possible, we went one step further by [filtering some input masks](#labelfocus).
@@ -751,9 +788,9 @@ In light of these results, it can be asserted that augmenting the dataset by cro
 
 ![](images/12-Normalisations.png)
 
-[_Image source_](https://medium.com/syncedreview/facebook-ai-proposes-group-normalization-alternative-to-batch-normalization-fb0699bffae7)
+_Figure 23: different normalization strategies. [Image source](https://medium.com/syncedreview/facebook-ai-proposes-group-normalization-alternative-to-batch-normalization-fb0699bffae7)_
 
-As we had color problems when [training with the mid resolution 2x2 dataset](#midresolution), we gave it a try and we built a generator substituting all the batch normalization layers by instance normalization ones and trained the model against the low resolution dataset. We used the same hyperparameters (learning rate, lambda, epochs, ...) used to train the baseline model.
+As we had color problems when [training with the Mid resolution 2x2 dataset](#midresolution), we gave it a try and we built a generator substituting all the batch normalization layers by instance normalization ones and trained the model against the low resolution dataset. We used the same hyperparameters (learning rate, lambda, epochs, ...) used to train the baseline model.
 
 The images obtained with our validation masks had better defined building shapes. The non labelled areas showed less vivid colors. It was remarkable that colors seemed more consistent than in the baseline (no slight tendency to show saturated colors). Images generated with full sized validation masks follow:
 
@@ -765,6 +802,8 @@ The images obtained with our validation masks had better defined building shapes
     <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-tyrol-w29.jpeg" width=19%>
     <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-vienna29.jpeg" width=19%>
 </div>
+
+_Figure 24: generated images from the test masks in Figure 7 using the instance norm model_
 
 Even if forcing the model to generate images as if it were trained with the mid resolution 2x2 dataset, no color defects are shown:
 
@@ -803,7 +842,9 @@ Even if forcing the model to generate images as if it were trained with the mid 
     </div>
 </div>
 
-In this second set of images non labelled areas show more grain effects. So it seemed that substituting batch normalization by instance normalization gave us a better color control at the cost of a slightly slower training time and more checkerboard effects in non labelled areas. From that moment on, we used instance normalization in the rest of our experiments (some of them already explained in previous sections, like using the mid resolution full dataset and the high resolution dataset).
+_Figure 25: generated images from the test masks in Figure 12 using the instance norm model_
+
+In this second set of images non labelled areas show more grain effects. So it seemed that substituting batch normalization by instance normalization gave us a better color control at the cost of a slightly slower training time and more checkerboard effects in non labelled areas. From that moment on, we used instance normalization in the rest of our experiments (some of them already explained in previous sections, like using the mid resolution full dataset and the high resolution dataset) and we named the obtained model our **instance norm baseline**.
 
 <p align="right"><a href="#toc">To top</a></p>
 
@@ -867,6 +908,8 @@ Finally, images generated during inference are displayed in a grid-like format b
     </div>
 </div>
 
+_Figure 26: generated images from the test masks in figure 12 using the model trained with a subset of the Mid resolution 2x2 dataset where masks with less than a 25% of label pixels were excluded_
+
 There are no signs of checkerboard effects and/or color saturation issues. Further, color selection is way more accurate. The model is capable of painting building roofs, roads, skyscrapers and other objects. Over-exposure of green colors have been corrected filtering out low pixel density masks. Objects are substantially more detailed and differentiable than in previous iterations. 
 
 To sum it up, narrowing the scope to input images with higher pixel density seem to be an appropriate measure to aid the model map input shapes onto output objects. An overall higher quality, in terms of shape and color, is present on all generated images. Previous issues regarding color saturation and checkerboard haven't showed up. 
@@ -887,6 +930,8 @@ Mathematically, the authors expressed the VGG loss as:
 
 <img src="images/16-VGGlossMath.png" width=40%>
 
+_Figure 27: mathematical definition of the VGG loss_
+
 φi,j indicates the feature map obtained by the j-th convolution (after ReLU activation) before the i-th maxpooling layer within the VGG19 network. In our model, G_θ_G(I^LR) is the generated image from the labelled mask and I^HR is the original satellite one. W_i,j and H_i,j are the dimensions of the respective feature maps within the VGG network. In our case, we used all the convolutional filters of the VGG19 network.
 
 We added the VGG loss to the existing generator's loss: `criterionGAN(pred_fake, True) + lambdaL1 * L1 + lambdaVGG * VGG`. The lambdas hyperparameters allowed to balance the weight of both content losses with respect to the loss coming from the discriminator (criterionGAN).
@@ -905,10 +950,12 @@ lambdaL1 | lambdaVGG | Results
 Considering the selected toy trainings, the avg PSNR's shape changed when using only the VGG loss, although the values were much lower than with the original L1 loss. When combining both losses (100 in both lambdas), the shape during the training was quite similar to the original one but the final PSNR value ended up a bit higher. Following you can see a comparison between a training with only L1 (left), with only VGG loss (center) and combining both (right):
 
 ![](images/16-VGGLossesPSNR.png)
+_Figure XXX:_
 
 Perceptually, the results didn't apparently improve those from our baseline training. Between both tests, our impression was that combininng both losses showed slightly more realistic results than the VGG alone. In both cases checkerboard effects and repeating patterns appeared in blank non-labelled areas:
 
 ![](images/16-VGGLossesTestImages.png)
+_Figure 29: comparison of generated images using different combinations of lambda values for the content loss_
 
 As these were toy trainings with few images from city landscapes, we decided to make a training with the two combinations of lambdas that gave the best results with the standard low resolution dataset and the same conditions as our baseline models to confirm whether the VGG loss wasn't that useful with the satellite images we worked with. You can find the Colab notebook we implemented [here](colab_notebooks/04_TrainImagesAlreadyTransformedVGG.ipynb).
 
@@ -918,9 +965,10 @@ As these were toy trainings with few images from city landscapes, we decided to 
 
 ### 6.iv.a. VGG alone as content loss
 
-A full training substituting the L1 content loss by the VGG loss (with LambdaL1 to 0 and LambdaVGG to 100) using 135 full scale training images took 5h 20 minutes to complete. So, as a first takeaway, using the VGG loss requires much more computing resources compared to using only a L1 loss. Considering the avg PSNR metric, the full training kept the same shape seen in the toy training, although the final value was clearly lower than those obtained in the baselines. Regarding losses, both the discriminator's and the generator's ones showed progressive learning. This was our first time we saw the discriminator loss to go clearly down as the training progressed:
+A full training substituting the L1 content loss by the VGG loss (with LambdaL1 to 0 and LambdaVGG to 100) using the Low resolution dataset took 5h 20 minutes to complete. So, as a first takeaway, using the VGG loss requires much more computing resources compared to using only a L1 loss. Considering the avg PSNR metric, the full training kept the same shape seen in the toy training, although the final value was clearly lower than those obtained in the baselines. Regarding losses, both the discriminator's and the generator's ones showed progressive learning. This was our first time we saw the discriminator loss to go clearly down as the training progressed:
 
 <img src="images/16-VGGalonePSNR.png" width=33%> <img src="images/16-VGGaloneLosses.png" width=65%>
+_Figure XXX:_
 
 We then created our test set of images to see the results:
 
@@ -933,6 +981,8 @@ We then created our test set of images to see the results:
     <img src="images/NoSplit-VGGalone/Generated-vienna29.jpeg" width=19%>
 </div>
 
+_Figure 31: generated images from the test masks in figure 7 using the model with the VGG loss as the only content loss_
+
 The generated images seem quite realistic for us. When comparing with our instance norm baseline (see below), almost no checkerboard effect can be appreciated. Non-labelled areas are more uniform, in the sense that there's almost no mix of grey (road) and green (trees) shapes. Hence that in the countryside example of kitsap29 (in the middle), it decides to "paint" more trees while in tyrol-29 (mid-right) and vienna29 (rightmost) a sort of grass lands are painted. So the model apparently learned to distinguish between a mask based on a small village and a mask based on more populated areas. On the other hand, the buildings and streests in austin29 (leftmost) are less distinguishable than its instance norm baseline counterpart.
 
 <div id="fullsizemaskswithinstancenorm">
@@ -943,11 +993,18 @@ The generated images seem quite realistic for us. When comparing with our instan
     <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-vienna29.jpeg" width=19%>
 </div>
 
+_Figure 32: generated images from the test masks in figure 7 using the instance norm baseline_
+
+<p align="right"><a href="#toc">To top</a></p>
+
+
+
 ### 6.iv.b. Combining the VGG loss and the L1 loss
 
-As the toy trainings showed slightly better results when combining both a VGG loss with an L1 loss (LambdaL1 = 100 and LambdaVGG = 100), we then went for a full training with the same dataset and parameters. The training took 5h 26m and the progress values showed similar patterns as previous baselines except for the discriminator's loss, which showed tendency to lower (except for a crazy rise soon recovered) ending down to almost 0. The avg PSNR ended in a much higher value than using only the VGG loss as content loss:
+As the toy trainings showed slightly better results when combining both a VGG loss with an L1 loss (LambdaL1 = 100 and LambdaVGG = 100), we then went for a full training with the Low resolution dataset and the same parameters. The training took 5h 26m and the progress values showed similar patterns as previous baselines except for the discriminator's loss, which showed tendency to lower (except for a crazy rise soon recovered) ending down to almost 0. The avg PSNR ended in a much higher value than using only the VGG loss as content loss:
 
 <img src="images/16-VGGplusL1PSNR.png" width=32%> <img src="images/16-VGGplusL1DiscriminatorLoss.png" width=32%> <img src="images/16-VGGplusL1GeneratorLoss.png" width=32%>
+_Figure XXX_
 
 The expectations where high, but the results where deceiving:
 
@@ -959,6 +1016,8 @@ The expectations where high, but the results where deceiving:
     <img src="images/NoSplit-VGGplusL1/Generated-tyrol-w29.jpeg" width=19%>
     <img src="images/NoSplit-VGGplusL1/Generated-vienna29.jpeg" width=19%>
 </div>
+
+_Figure 34: generated images from the test masks in figure 7 using the model with a content loss combining both a VGG loss and a L1 loss_
 
 The resulting images are really blurry. The buildings are much less sharpen, the streets are much less realistic and non-labelled areas appear much less defined and full of checkerboard effects.
 
@@ -973,6 +1032,8 @@ As a conclusion, defining the content loss with a VGG loss can pay off in some d
 One of the changes we tried in order to overcome the loose of color precision was using a [ReduceLROnPlateau](https://pytorch.org/docs/stable/optim.html#torch.optim.lr_scheduler.ReduceLROnPlateau) scheduler instead of a LambdaLR one. Pix2pix uses two schedulers: one for the generator and one for the discriminator. ReduceLROnPlateau needs the losses to decide when to change the learning rate, so we fed the generator loss to its scheduler and the discriminator loss to its own scheduler. The result was a disaster: the LR fell down to 0 in few epochs:
 
 <img src="images/18-GeneratorsReduceLROnPlateau.png" width="40%"> <img src="images/18-DiscriminatorsReduceLROnPlateau.png" width="39%">
+
+_Figure 35: loss progression from both the generator (left) and the discriminator (right) when using ReduceLROnPlateau_
 
 <p align="right"><a href="#toc">To top</a></p>
 
@@ -989,7 +1050,9 @@ Our implementation of pix2pix calculates the average PSNR as a metric of the qua
 
 So to overcome the lack of correspondance between the PSNR and the quality we perceived from the generated images, we calculated the FID for the main trainings made throughout the project. A [complete table](images/20-FIDresults.pdf) can be consulted in the repository. Below you can find a partial result:
 
+XXX Rename baselines? XXX
 ![](images/20-FIDresults.png)
+_Figure 36: Fréchet Inception Distance values for different trainings done in the project_
 
 We found that the FID obtained was consistent with our observings in many examples. The [baseline](#baselineresults) (328.378) performed better than the [generator alone test](#generatoraloneimages) (379,982), the [model trained with 512x512 images](#biggerimages) (398.007) and slightly better than the [instance normalisation baseline](#fullsizemaskswithinstancenorm) (332.123). But we don't agree with the lower FIDs obtained in the trainings with 2x2 splits (both [from scratch](#2x2maskwith2x2training) and [from the baseline](#frombaseline)). We're also surprised of such a low value of the [VGG alone model](#VGGalone) (232.636), as the quality of images are, for us, comparable to those from the [baseline](#baselineresults) or the [instance normalisation baseline](#fullsizemaskswithinstancenorm). The lack of a big test dataset reduces the reliability of the FID, and that's our case.
 
