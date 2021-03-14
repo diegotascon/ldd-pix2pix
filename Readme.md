@@ -25,8 +25,7 @@ Advised by professor [Eva Mohedano](https://www.linkedin.com/in/eva-mohedano-261
     4. [Does the discriminator help?](#nodiscriminator)
 6. [The quest for improving the results](#improvingresults)
     1. [Increasing the pixel resolution of images](#increaseresolution)
-        1. [Resolutions](#resolutions)
-        2. [Mid resolution](#midresolution)
+        1. [Mid resolution](#midresolution)
         3. [High resolution](#highresolution)
     2. [Instance Normalization](#instancenorm)
     3. [Focusing on labelled areas](#labelfocus)
@@ -48,7 +47,7 @@ In this project we're exploring the possibilities of applying conditional GANs t
 
 ## 1.i. Motivation <a name="motivation"></a>
 
-Conditional GANs offer multiple applications for generating tailored images in a target domain. Using them with satellite images sounded attractive and has a practical use case. Annotating images, specially aerial ones, is a hard and very time consuming task. So a cGAN trained to generate images from forged masks can help increasing the size of aerial datasets.
+Conditional GANs offer multiple applications for generating tailored images in a target domain. Using them with satellite images sounded attractive and has a practical use case. Annotating images, especially aerial ones, is a hard and very time consuming task. So a cGAN trained to generate images from forged masks can help increasing the size of aerial datasets.
 
 <p align="right"><a href="#toc">To top</a></p>
 
@@ -78,7 +77,7 @@ The whole training set is 15GB of space. Satellite images are 72MB each one and 
 <p align="right"><a href="#toc">To top</a></p>
 
 # 3. Working environment <a name="working_env"></a>
-We have developed the project using [Google Colab](https://colab.research.google.com/), which gave us easy and free access to GPUs. We've used both local Colab and Google Drive storage. For some parts, though, we've also used a local python container based on the offical [Docker Hub image](https://hub.docker.com/_/python). We've also created a [Google Cloud](https://cloud.google.com/) Deep Learning VM instance for longer trainings.
+We have developed the project using [Google Colab](https://colab.research.google.com/), which gave us easy and free access to GPUs. We've used both local Colab and Google Drive storage. For some parts, though, we've also used a local python container based on the official [Docker Hub image](https://hub.docker.com/_/python). We've also created a [Google Cloud](https://cloud.google.com/) Deep Learning VM instance for longer trainings.
 
 <p ><img src="images/02-collab.jpg" width="200"> <img src="images/02-gdrive.png" width="200"> <img src="images/02-docker-logo.png" width="200"> <img src="images/02-googlecloud.jpg" width="200"></p>
 
@@ -138,7 +137,7 @@ Our first steps with the chosen implementation were to understand it, compare it
 ## 5.ii. Accessing the dataset <a name="datasetaccess"></a>
 Understanding how to access the dataset was crucial. We followed the recommendations from [this article](https://towardsdatascience.com/preparing-tiff-images-for-image-translation-with-pix2pix-f56fa1e937cb) to discover that the TIFF masks had only one channel and their values were held in a [0:255] range, as PNG or JPEG images. Moreover, the picked implementation converted the read images, both satellite ones and masks, to RGB (adding 2 channels to the masks), so we didn't have to treat the dataset in a special way. The images are then resized to 286x286, transformed into a tensor, their values get normalized, a random 256x256 crop is performed and in half of the times they're flipped.
 
-After feeling confortable with short trainings (10 or 20 epochs, 20 images) we started to make longer ones (300 epochs, 115 images), and that revealed a weakness of our model: every epoch could take up to 6 minutes. That resulted in 30 hours of training. Soon, Colab started complaining about our abuse of GPU usage. So we had to make something about it.
+After feeling comfortable with short trainings (10 or 20 epochs, 20 images) we started to make longer ones (300 epochs, 115 images), and that revealed a weakness of our model: every epoch could take up to 6 minutes. That resulted in 30 hours of training. Soon, Colab started complaining about our abuse of GPU usage. So we had to make something about it.
 
 The dataset class [DatasetFromFolder](dataset.py) reads every 72MB satellite image and its 1MB corresponding mask once in every epoch. Every read image and mask is transformed as explained before. Most of that work could be done prior to the training in only one run. So we made a [script](transform-dataset.py) to pretransform all the masks and images to 286x286 with normalized values and save them to .npy numpy array files. We also adapted the DatasetFromFolder class to read the new files, transform them into torch tensors to random crop and random flip them. A training epoch then lasted only 13 seconds!
 
@@ -181,9 +180,9 @@ On the other hand, larger lambda values of 25, 50 and 100 helped the model to im
 
 _Figure 3: loss plots for the discriminator (left) and generator (right) when training with a lambda value of 100_
 
-Those labmda values made the discriminator's loss rise a bit and the generator's loss descended in a continuos manner. That could mean that giving more weight to the content loss with regard to the loss coming from the discriminator helped the model learn better. So minimizing the generator's loss revealed as our best target to obtain quality images.
+Those lambda values made the discriminator's loss rise a bit and the generator's loss descended in a continuous manner. That could mean that giving more weight to the content loss with regard to the loss coming from the discriminator helped the model learn better. So minimizing the generator's loss revealed as our best target to obtain quality images.
 
-The avg. PSNR hadn't any correspondance with the perceptual quality of images. As show in figure 4, the PSNR tended to peak between epoch 100 and 200 in different trainings, but the images produced in those stages were just horrible:
+The avg. PSNR hadn't any correspondence with the perceptual quality of images. As show in figure 4, the PSNR tended to peak between epoch 100 and 200 in different trainings, but the images produced in those stages were just horrible:
 
 <img src="images/06-BaselinePSNR.png" width="50%">
 
@@ -206,7 +205,7 @@ Hyperparameters | Values | Comments
 --------------- | ------ | --------
 Learning rate (LR) | 0.0002 | This default value gave us the best results
 LR | 0.002 | A 10x learning rate collapsed the training
-LR | 0.0001, 0.0003, 0.001 | Slighly increasing or decreasing the LR sistematically poored down the generated images
+LR | 0.0001, 0.0003, 0.001 | Slightly increasing or decreasing the LR systematically impoverished the generated images
 Lambda | 10 | With the default lambda value the learning progress dropped down in few epochs
 Lambda | 1, 2 | Low lambda values resulted in poor training results
 Lambda | 25, 50, 100 | High lambda values helped the model learn the dataset details
@@ -252,7 +251,7 @@ In general, the model performs acceptably well when the mask is almost full of a
 
 ## 5.iv. Does the discriminator help? <a name="nodiscriminator"></a>
 
-Once we had a working cGAN, a question arose: if we're just trying to map images from one domain (labelled masks) to another (satellite images) and the generator's loss has a bigger influence in the capacity of the model to learn, does the extra burden of having a discriminator pay off? Papers tell so, but we made a test to prove it with our dataset. So we [built a model](model_variations/generator_alone) removing the discriminator. As a loss we left the L1 * lambda content loss, which compared the generated image with the ground truth. We trained the model with the same parameters as the previous one: 900 epochs, a learning rate of 0.0002, lambda of 100. We used our [Google Cloud instance](#gcinstance) to train, which lasted 04:27:43 for less than 1€.
+Once we had a working cGAN, a question arose: if we're just trying to map images from one domain (labelled masks) to another (satellite images) and the generator's loss has a bigger influence in the capacity of the model to learn, does the extra burden of having a discriminator pay off? Papers tell so, but we made a test to prove it with our dataset. So we [built a model](model_variations/generator_alone_baseline) removing the discriminator. As a loss we left the L1 * lambda content loss, which compared the generated image with the ground truth. We trained the model with the same parameters as the previous one: 900 epochs, a learning rate of 0.0002, lambda of 100. We used our [Google Cloud instance](#gcinstance) to train, which lasted 04:27:43 for less than 1€.
 
 The metrics showed similar to the previous training, with a higher final PSNR and a lower loss:
 
@@ -488,13 +487,13 @@ _Figure 15: generated images from the test masks in figure 12 using the baseline
 
 Some checkerboard effects can also be seen when generating from big empty (non-labelled) spaces.
 
-For some reason, the model had a tendency to saturate colors from the zoomed in satellite images, something we didn't observe when full images were used. If the already trained baseline model had learnt appropiate colors, perhaps further training it with the new dataset will allow it to learn the details without loosing the color scheme.
+For some reason, the model had a tendency to saturate colors from the zoomed in satellite images, something we didn't observe when full images were used. If the already trained baseline model had learnt appropriate colors, perhaps further training it with the new dataset will allow it to learn the details without losing the color scheme.
 
 <p align="right"><a href="#toc">To top</a></p>
 
 
 
-#### Training mid resolution from baseline <a name="frombaseline"></a>
+#### Training Mid resolution from baseline <a name="frombaseline"></a>
 
 To avoid the color effects when training with the Mid resolution 2x2 dataset from scratch, we tried several trainings loading the already pretrained baseline model (where the low resolution dataset was used). To obtain a quick glimpse on whether the path taken could offer good results, we used a subset of 140 tiles (28 tiles from each city) and only 200 epochs. Colors suffered from saturation as in the previous training:
 
@@ -612,7 +611,7 @@ _Figure1 18: 2x2 tiles generated from the test masks of Chicago in figure 12 wit
 
 #### Training with the Mid resolution 2x2 dataset from scratch
 
-Once we realized that training from a checkpoint where the resolution of images changed caused the model to almost start from the beginning relearning patterns, we decided to train the model with the Mid resolution 2x2  dataset and instance normalisation from scratch. We hoped the model would learn more details with the this dataset while keeping good colors using instance normalisation.
+Once we realized that training from a checkpoint where the resolution of images changed caused the model to almost start from the beginning relearning patterns, we decided to train the model with the Mid resolution 2x2  dataset and instance normalization from scratch. We hoped the model would learn more details with this dataset while keeping good colors using instance normalization.
 
 A summary table is presented including set-up definition and time-to-completion:
 
@@ -737,7 +736,7 @@ On one hand the buildings seem less defined than in the low resolution training.
 
 
 
-### 6.i.c. High resolution <a name="highresolution"></a>
+### 6.i.b. High resolution <a name="highresolution"></a>
 
 A richer dataset seems to be a recurrent holy grail from which many issues could be solved. Reason for what, we decided to go one step further and use the high resolution dataset despite the mild results obtained with the mid resolution one.
 
@@ -756,7 +755,7 @@ Learning rate | 0.0002
 Lambda | 10
 Batch size | 2
 Crop window | 1000
-Normalisation layer | Instance
+Normalization layer | Instance
 Resize | 256
 
 The model was trained in three separate stages amounting for a total of 420 epochs (each 140 epochs).
@@ -795,7 +794,7 @@ As we had color problems when [training with the Mid resolution 2x2 dataset](#mi
 The images obtained with our validation masks had better defined building shapes. The non labelled areas showed less vivid colors. It was remarkable that colors seemed more consistent than in the baseline (no slight tendency to show saturated colors). Images generated with full sized validation masks follow:
 
 <a name="fullsizemaskswithinstancenorm"></a>
-<div id="fullsizemaskswithinstancenorm">
+<div id="fullsizemaskswithinstancenorm_b">
     <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29.jpeg" width=19%>
     <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29.jpeg" width=19%>
     <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-kitsap29.jpeg" width=19%>
@@ -854,7 +853,7 @@ In this second set of images non labelled areas show more grain effects. So it s
 
 Blurriness or a lack of high frequency details has been one of the limiting factors during model generation. Thus a deeper understanding of our input data (masks) was mainly motivated by the need to fight its causality. A simple visual observation of the input binary masks uncovered a clear distinction between them. Some masks were plagued with labelled areas, whereas others simply did not contain sufficient labelled areas for fulfilling its purpose. Most of those quasi-empty masks came from very open, forestry landscapes were more organic shapes (like tree cups) define its nature, therefore being more difficult to capture. This duality was magnified in the mid resolution 2x2 and high resolution datasets.
 
-Images were filtered out based on pixel density (relation between white pixel to total pixels). Any input mask with a pixel density below 0.25 was filtered out. Details for the implementation are shown in XXX. For a better comparison with already accomplished experiments, the mid resolution 2x2 dataset was used for this run. As a result of the filtering process train, validation and test sets accounts for 345, 77 and 45 images respectively. 
+Images were filtered out based on pixel density (relation between white pixel to total pixels). Any input mask with a pixel density below 0.25 was filtered out. Details for the implementation are shown in XXX. For a better comparison with already accomplished experiments, the Mid resolution 2x2 dataset was used for this run. As a result of the filtering process train, validation and test sets accounts for 345, 77 and 45 images respectively. 
 
 A summary table is presented including set-up definition and time-to-completion:
 
@@ -910,7 +909,7 @@ Finally, images generated during inference are displayed in a grid-like format b
 
 _Figure 26: generated images from the test masks in figure 12 using the model trained with a subset of the Mid resolution 2x2 dataset where masks with less than a 25% of label pixels were excluded_
 
-There are no signs of checkerboard effects and/or color saturation issues. Further, color selection is way more accurate. The model is capable of painting building roofs, roads, skyscrapers and other objects. Over-exposure of green colors have been corrected filtering out low pixel density masks. Objects are substantially more detailed and differentiable than in previous iterations. 
+There are no signs of checkerboard effects and/or color saturation issues. Further, color selection is way more accurate. The model is capable of painting building roofs, roads, skyscrapers and other objects. Over-exposure of green colors has been corrected filtering out low pixel density masks. Objects are substantially more detailed and differentiable than in previous iterations. 
 
 To sum it up, narrowing the scope to input images with higher pixel density seem to be an appropriate measure to aid the model map input shapes onto output objects. An overall higher quality, in terms of shape and color, is present on all generated images. Previous issues regarding color saturation and checkerboard haven't showed up. 
 
@@ -952,7 +951,7 @@ Considering the selected toy trainings, the avg PSNR's shape changed when using 
 ![](images/16-VGGLossesPSNR.png)
 _Figure XXX:_
 
-Perceptually, the results didn't apparently improve those from our baseline training. Between both tests, our impression was that combininng both losses showed slightly more realistic results than the VGG alone. In both cases checkerboard effects and repeating patterns appeared in blank non-labelled areas:
+Perceptually, the results didn't apparently improve those from our baseline training. Between both tests, our impression was that combining both losses showed slightly more realistic results than the VGG alone. In both cases checkerboard effects and repeating patterns appeared in blank non-labelled areas:
 
 ![](images/16-VGGLossesTestImages.png)
 _Figure 29: comparison of generated images using different combinations of lambda values for the content loss_
@@ -983,9 +982,9 @@ We then created our test set of images to see the results:
 
 _Figure 31: generated images from the test masks in figure 7 using the model with the VGG loss as the only content loss_
 
-The generated images seem quite realistic for us. When comparing with our instance norm baseline (see below), almost no checkerboard effect can be appreciated. Non-labelled areas are more uniform, in the sense that there's almost no mix of grey (road) and green (trees) shapes. Hence that in the countryside example of kitsap29 (in the middle), it decides to "paint" more trees while in tyrol-29 (mid-right) and vienna29 (rightmost) a sort of grass lands are painted. So the model apparently learned to distinguish between a mask based on a small village and a mask based on more populated areas. On the other hand, the buildings and streests in austin29 (leftmost) are less distinguishable than its instance norm baseline counterpart.
+The generated images seem quite realistic for us. When comparing with our instance norm baseline (see below), almost no checkerboard effect can be appreciated. Non-labelled areas are more uniform, in the sense that there's almost no mix of grey (road) and green (trees) shapes. Hence that in the countryside example of kitsap29 (in the middle), it decides to "paint" more trees while in tyrol-29 (mid-right) and vienna29 (rightmost) a sort of grass lands are painted. So the model apparently learned to distinguish between a mask based on a small village and a mask based on more populated areas. On the other hand, the buildings and streets in austin29 (leftmost) are less distinguishable than its instance norm baseline counterpart.
 
-<div id="fullsizemaskswithinstancenorm">
+<div id="fullsizemaskswithinstancenorm_c">
     <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-austin29.jpeg" width=19%>
     <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-chicago29.jpeg" width=19%>
     <img src="images/NoSplitLR0.0002Lambda100-InstanceNorm/Generated-kitsap29.jpeg" width=19%>
@@ -1019,7 +1018,7 @@ The expectations where high, but the results where deceiving:
 
 _Figure 34: generated images from the test masks in figure 7 using the model with a content loss combining both a VGG loss and a L1 loss_
 
-The resulting images are really blurry. The buildings are much less sharpen, the streets are much less realistic and non-labelled areas appear much less defined and full of checkerboard effects.
+The resulting images are really blurry. The buildings are much less sharpened, the streets are much less realistic and non-labelled areas appear much less defined and full of checkerboard effects.
 
 As a conclusion, defining the content loss with a VGG loss can pay off in some datasets. In our case, where the training time almost doubled, we don't think it is worth the extra cost compared to our baseline models.
 
@@ -1046,15 +1045,15 @@ Our implementation of pix2pix calculates the average PSNR as a metric of the qua
 
 ## 7.i. Fréchet Inception Distance (FID) <a name="frechet"></a>
 
-[Martin Heusel et al. introduced](https://arxiv.org/abs/1706.08500) in 2017 the Fréchet Inception Distance, a metric to capture the sharpiness and quality of forged images from GANs in a manner closer to a human eye than other existing methods. It is based on the [Inception score](https://arxiv.org/abs/1606.03498), which uses a pretrained Inception v3 model trained on ImageNet to predict the scores of made up images. FID compares the predictions of generated images with the predictions for the original ones and elaborates a distance metric. If images are identical, a 0 distance is issued. As the distance grows, the quality of generated images worsens.
+[Martin Heusel et al. introduced](https://arxiv.org/abs/1706.08500) in 2017 the Fréchet Inception Distance, a metric to capture the sharpness and quality of forged images from GANs in a manner closer to a human eye than other existing methods. It is based on the [Inception score](https://arxiv.org/abs/1606.03498), which uses a pretrained Inception v3 model trained on ImageNet to predict the scores of made up images. FID compares the predictions of generated images with the predictions for the original ones and elaborates a distance metric. If images are identical, a 0 distance is issued. As the distance grows, the quality of generated images worsens.
 
-So to overcome the lack of correspondance between the PSNR and the quality we perceived from the generated images, we calculated the FID for the main trainings made throughout the project. A [complete table](images/20-FIDresults.pdf) can be consulted in the repository. Below you can find a partial result:
+So to overcome the lack of correspondence between the PSNR and the quality we perceived from the generated images, we calculated the FID for the main trainings made throughout the project. A [complete table](images/20-FIDresults.pdf) can be consulted in the repository. Below you can find a partial result:
 
 XXX Rename baselines? XXX
 ![](images/20-FIDresults.png)
 _Figure 36: Fréchet Inception Distance values for different trainings done in the project_
 
-We found that the FID obtained was consistent with our observings in many examples. The [baseline](#baselineresults) (328.378) performed better than the [generator alone test](#generatoraloneimages) (379,982), the [model trained with 512x512 images](#biggerimages) (398.007) and slightly better than the [instance normalisation baseline](#fullsizemaskswithinstancenorm) (332.123). But we don't agree with the lower FIDs obtained in the trainings with 2x2 splits (both [from scratch](#2x2maskwith2x2training) and [from the baseline](#frombaseline)). We're also surprised of such a low value of the [VGG alone model](#VGGalone) (232.636), as the quality of images are, for us, comparable to those from the [baseline](#baselineresults) or the [instance normalisation baseline](#fullsizemaskswithinstancenorm). The lack of a big test dataset reduces the reliability of the FID, and that's our case.
+We found that the FID obtained was consistent with our observing in many examples. The [baseline](#baselineresults) (328.378) performed better than the [generator alone test](#generatoraloneimages) (379,982), the [model trained with the High resolution dataset](#highresolution) (398.007) and slightly better than the [instance normalization baseline](#fullsizemaskswithinstancenorm) (332.123). But we don't agree with the lower FIDs obtained in the trainings with the Mid resolution 2x2 dataset (both [from scratch](#2x2maskwith2x2training) and [from the baseline](#frombaseline)). We're also surprised of such a low value of the [VGG alone model](#VGGalone) (232.636), as the quality of images are, for us, comparable to those from the [baseline](#baselineresults) or the [instance normalization baseline](#fullsizemaskswithinstancenorm). The lack of a big test dataset reduces the reliability of the FID, and that's our case.
 
 We used an [implementation](https://github.com/mseitzer/pytorch-fid) simple to install through pip and easy to use.
 
@@ -1074,14 +1073,14 @@ Both reasons were enough to follow the advice of our lecturers to create a [Goog
 
 ## 8.i. Pros and cons <a name="prosandcons"></a>
 
-So we had a shiny new cloud environment with no time limitations and we began using it. Soon we realized it wasn't a marvellous solution:
+So we had a shiny new cloud environment with no time limitations and we began using it. Soon we realized it wasn't a marvelous solution:
 
 - **It is slower than Colab**: our first serious training (540 images coming from splitting by 2x2 the 135 full images we used in our baseline training) showed that every epoch lasted 104 seconds instead of the 52 seconds we expected (even using a bigger batch size). As all the images were stored in memory, disk access shouldn't be the problem. The CPU didn't seem busy, so we considered it coped feeding the GPU in time. The result was that training 900 epochs lasted almost 25 hours compared to the 3 hours it lasted the baseline training.
 - **It costs money**: no surprise here. The good news is that the first time you use Google Cloud you're awarded 300€ to test their services. As a reference, our 25 hour training costed 16€.
 
 So, why use the instance? Here are some reasons:
-- **Production experience**: the instance gives us the oportunity to adapt the code to a production alike environment. Well, we're sure it is still a simple environment (single instance, no shared storage, no REST APIs exposed), but it is a step forward compared to sticking to Google Colab.
-- **No time limit**: it allowes us running long trainings as a batch job, with no care about the limits of Colab or maintaining the session alive. The lack of time limits gives us more freedom, but money limits are still there.
+- **Production experience**: the instance gives us the opportunity to adapt the code to a production alike environment. Well, we're sure it is still a simple environment (single instance, no shared storage, no REST APIs exposed), but it is a step forward compared to sticking to Google Colab.
+- **No time limit**: it allows us running long trainings as a batch job, with no care about the limits of Colab or maintaining the session alive. The lack of time limits gives us more freedom, but money limits are still there.
 
 <p align="right"><a href="#toc">To top</a></p>
 
@@ -1096,11 +1095,11 @@ Early on in the decision process, we chose an implementation slightly less compl
 
 We attacked multiple frontiers as a hope to mitigate, or at least palliate, the prevalence of those problems. Several bullet points enumerate these strategies along with a brief explanation:
 
-* __Data augmentation__: our original image size of 5000x5000 was way too big to be fed directly into the architecture. The input size for our model was set to 256x256, thus imposing a big loss of information (reduction factor of 306!). Cropping the original images was an obvious strategy. Two different datasets were created: 2x2 and 5x5 splits. There is some inconsistency in the results between the 2x2 and 5x5 dataset. While the 2x2 dataset did not show particular improvements and a new issue arise (color saturation), the 5x5 model did performed particularly good. In general, we consider that this strategy helped the model identify more objects and capture finer details. It also toned down the appearance of checkerboard effects (at least for urban landscapes in the 5x5 dataset).
+* __Data augmentation__: our original image size of 5000x5000 was way too big to be fed directly into the architecture. The input size for our model was set to 256x256, thus imposing a big loss of information (from 0.3 m/px to 5.25 m/px). Increasing the pixel resolution by cropping the original images was an obvious strategy. Two different datasets were created: the Mid resolution 2x2 and the High resolution one. There is some inconsistency in the results between the Mid and the High resolution datasets. While the Mid resolution 2x2 dataset did not show particular improvements and a new issue arise (color saturation), the High resolution dataset did performed particularly good. In general, we consider that this strategy helped the model identify more objects and capture finer details. It also toned down the appearance of checkerboard effects (at least for urban landscapes).
 
 * __Instance Normalization__: we attributed the source of color saturation in our generated images to the batch norm layer. Normalizing each image independently lowered color problems, ending up with a better color control in the output. However, instance normalization comes to the spend of a higher computational cost compared to its cousin.
 
-* __Input size__: 256x256 was the original input size for the first convolutional layers. We decided to change it to 512x512 and run some experiments. It turned out that images were not better increasing input size. Further, given the overhead in computing time, we rapidly discarded this option.
+* __Input size__: 256x256 was the original input size for the first convolutional layers. We decided to change it to 512x512 (through the Mid resolution full dataset) and run some experiments. It turned out that images were not better increasing the input size. Further, given the overhead in computing time, we rapidly discarded this option.
 
 * __Data filtering__: our dataset had a clear distinction between rural and urban landscapes. For rural landscapes, a considerable percentage of masks were purely black pixels. That lack of information prevented the model from correctly mapping input shapes onto output objects and, therefore, ending up with an overexposure of green colors (characteristics of forest/river-lands/lawns). We defined a metric for pixel density controlled, which was experimentally established at 25% (ratio of white pixels to total pixels). After applying this pre-processing condition to our dataset, color allocation greatly improved. The model learnt to map shapes from input masks to its real objects. It also reduced checkerboard effects and increased overall quality.
 
@@ -1136,8 +1135,8 @@ The lack of time prevented us from trying some more ideas in our quest for obtai
 
 - **LR_scheduler strategy**: all of our trainings used the default LambdaLR, except for some tests with [ReduceLROnPlateau](#plateau) based on the losses, which didn't work out. Trying other schedulers or different parametrizations for them (for example, ReduceLROnPlateau configured to maximize the PSNR) might help to get out of local minima.
 - **Data augmentation for masks**. More variety of masks per ground-truth image and higher detail content per mask. Masks are very simplistic with an overall lack of detailing. Training a generative model to create higher quality mask using the original test images could open a new line of investigation.
-- **Use lower layers in VGG loss**. Instead of considering all the convolutional layers from a VGG19 pretrained network to calculate de VGG loss, upper layers could be discarded to avoid features proner to a classification task. Moreover, a lighter network will improve training times.
-- **Fine tuning pixel ratio/pixel density for image filter**. Our original value of 0.25 was choosen pretty randomly. Thus a need for finer selection could weed out problematic masks (high non-labelled are per picture). As the saying goes: ‘_You cannot get something out of nothing_’.
+- **Use lower layers in VGG loss**. Instead of considering all the convolutional layers from a VGG19 pretrained network to calculate de VGG loss, upper layers could be discarded to avoid features prone to a classification task. Moreover, a lighter network will improve training times.
+- **Fine tuning pixel ratio/pixel density for image filter**. Our original value of 0.25 was chosen pretty randomly. Thus a need for finer selection could weed out problematic masks (high non-labelled are per picture). As the saying goes: ‘_You cannot get something out of nothing_’.
 - **Improve upscale layers** to reduce/eliminate checkerboard effects that have contaminated practically all results. Even though Instance Normalization handled most of this issues pretty well, a deeper understanding might be needed. Upscale convolutional layers are causing this effect and alternatives could be helpful to completely erase its nature.
 - **Embed extra information to binary mask**, aiding the model to learn/map shapes to actual colors and objects. This could be a segmentation mask adding object labels or adding color-based information to the binary mask.
 - **Transfer learning**. Given the absence of a huge dataset, random initialization might not be enough to get the model out of local minima. Training curves notoriously showed plateaus from which the model could not escape. Searching for pre-trained implementations with valuable parameters could further increase chances of obtaining higher quality results. At the beginning of the project, it was evaluated the option of implementing pre-trained ResNet blocks but discarded for time-constrain reasons.
