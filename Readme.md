@@ -28,7 +28,7 @@ Advised by professor [Eva Mohedano](https://www.linkedin.com/in/eva-mohedano-261
         1. [Mid resolution](#midresolution)
         3. [High resolution](#highresolution)
     2. [Instance Normalization](#instancenorm)
-    3. [Focusing on labelled areas](#labelfocus)
+    3. [Data filtering](#datafiltering)
     4. [VGG Loss](#vggloss)
     5. [Using the ReduceLROnPlateau scheduler](#plateau)
 7. [Quality metrics](#qualitymetrics)
@@ -629,7 +629,7 @@ Total time to completion (h) | 26.5
 
 Below a 2x2 image grid is displayed for each city. Each 2 by 2 grid represents the original full-sized image.
 
-Regarding output quality, two positive results are clearly derived. Neither color issues nor checkerboard effects seem to be degrading model generation. **XXX Contrary wise, blurriness and lack of detail has increased for this generative state XXX**. On top of that, color allocation throughout all generated images is yet problematic, with an over-allocation of green colors covering most unlabeled areas.
+Regarding output quality, two positive results are clearly derived. Neither color issues nor checkerboard effects seem to be degrading model generation. Contrary wise, blurriness and lack of detail has increased for this generative state. On top of that, color allocation throughout all generated images is yet problematic, with an over-allocation of green colors covering most unlabeled areas.
 
 Several conclusions were extracted from these results.
 
@@ -676,8 +676,6 @@ Several conclusions were extracted from these results.
 _Figure 19: generated images from the test masks in figure 12 training from scratch with the Mid resolution 2x2 dataset_
 
 Loss curves and PSNR shapes resemble to those of the baseline model. Losses converge towards a minimum, while PSNR steadily decreases over epoch time. Contrary to this metric’s logic, control images saved at TensorBoard at epoch 100 are visibly worse than those saved at epoch 900.
-
-A new course of action was derived from this experiment: [filter out input masks based on pixel density](#labelfocus) XXX Explain hypothesis here XXX.
 
 <p align="right"><a href="#toc">To top</a></p>
 
@@ -760,7 +758,7 @@ Resize | 256
 
 The model was trained in three separate stages amounting for a total of 420 epochs (each 140 epochs).
 
-Some generated images for each city are displayed below. Only 4 images per city are presented even though each original image was processed into 25 smaller pictures.
+Some generated images for each city from test masks are displayed below. Only 4 images per city are presented even though each original image was processed into 25 smaller pictures.
 
 <a name="split5x5"></a>
 City | Image
@@ -771,7 +769,7 @@ Kytsap | ![](images/Split5x5/Kytsap.png)
 Tyrol-w | ![](images/Split5x5/Tyrol-w.png)
 Vienna | ![](images/Split5x5/Vienna.png)
 
-_Figure 22: generated samples from masks of the High resolution dataset for 5 different cities_
+_Figure 22: generated samples from masks of the test subset of the High resolution dataset for 5 different cities_
 
 Cropping images to augment the resolution and increasing the dataset did resolve into a very outstanding improvement in image generation. The model is capable of identifying more complex objects such as tree cups and forests, roofs, building blocks. There are even some blue dots resembling of swimming pools! Particularly impressive is the nuances in some Chicago images where the model tried to paint some skyscraper shadows, which automatically increases realism in an image! But not all are roses and diamonds. Checkerboard effects and color issues are yet slightly prominent. Good news is that the majority of them are taking place, once again, for those rural/forestry landscapes. The model struggles to hallucinate correct shapes and colors when there is barely input information.
 
@@ -849,11 +847,11 @@ In this second set of images non labelled areas show more grain effects. So it s
 
 
 
-## 6.iii. Focusing on labelled areas <a name="labelfocus"></a>
+## 6.iii. Data filtering <a name="datafiltering"></a>
 
 Blurriness or a lack of high frequency details has been one of the limiting factors during model generation. Thus a deeper understanding of our input data (masks) was mainly motivated by the need to fight its causality. A simple visual observation of the input binary masks uncovered a clear distinction between them. Some masks were plagued with labelled areas, whereas others simply did not contain sufficient labelled areas for fulfilling its purpose. Most of those quasi-empty masks came from very open, forestry landscapes were more organic shapes (like tree cups) define its nature, therefore being more difficult to capture. This duality was magnified in the mid resolution 2x2 and high resolution datasets.
 
-Images were filtered out based on pixel density (relation between white pixel to total pixels). Any input mask with a pixel density below 0.25 was filtered out. Details for the implementation are shown in XXX. For a better comparison with already accomplished experiments, the Mid resolution 2x2 dataset was used for this run. As a result of the filtering process train, validation and test sets accounts for 345, 77 and 45 images respectively. 
+Images were filtered out based on pixel density (relation between white pixel to total pixels). Any input mask with a pixel density below 0.25 was filtered out. For a better comparison with already accomplished experiments, the Mid resolution 2x2 dataset was used for this run. As a result of the filtering process train, validation and test sets accounts for 345, 77 and 45 images respectively. 
 
 A summary table is presented including set-up definition and time-to-completion:
 
@@ -946,10 +944,10 @@ lambdaL1 | lambdaVGG | Results
 75 | 25 | Discarded as the quality of images was below than those from the two selected values
 50 | 1 | Discarded as the quality of images was below than those from the two selected values
 
-Considering the selected toy trainings, the avg PSNR's shape changed when using only the VGG loss, although the values were much lower than with the original L1 loss. When combining both losses (100 in both lambdas), the shape during the training was quite similar to the original one but the final PSNR value ended up a bit higher. Following you can see a comparison between a training with only L1 (left), with only VGG loss (center) and combining both (right):
+The shape of the avg PSNR recorded during the toy training when using only the VGG (lambdaL1 = 0, lambdaVGG = 100) was different compared to the trainings made so far, which could indicate a different learning pattern. In this case, the values were much lower than with the original L1 loss, which should be an indication of worse perceptual quality. When combining both losses (100 in both lambdas), the shape during the training was quite similar to the original one but the final PSNR value ended up a bit higher. Following you can see a comparison between a training with only L1 (left), with only VGG loss (center) and combining both (right):
 
 ![](images/16-VGGLossesPSNR.png)
-_Figure XXX:_
+_Figure 28: avg PSNR from a baseline training, a toy training substituting the L1 content loss with a VGG loss and a toy training combining a L1 + a VGG as a content loss_
 
 Perceptually, the results didn't apparently improve those from our baseline training. Between both tests, our impression was that combining both losses showed slightly more realistic results than the VGG alone. In both cases checkerboard effects and repeating patterns appeared in blank non-labelled areas:
 
@@ -967,7 +965,7 @@ As these were toy trainings with few images from city landscapes, we decided to 
 A full training substituting the L1 content loss by the VGG loss (with LambdaL1 to 0 and LambdaVGG to 100) using the Low resolution dataset took 5h 20 minutes to complete. So, as a first takeaway, using the VGG loss requires much more computing resources compared to using only a L1 loss. Considering the avg PSNR metric, the full training kept the same shape seen in the toy training, although the final value was clearly lower than those obtained in the baselines. Regarding losses, both the discriminator's and the generator's ones showed progressive learning. This was our first time we saw the discriminator loss to go clearly down as the training progressed:
 
 <img src="images/16-VGGalonePSNR.png" width=33%> <img src="images/16-VGGaloneLosses.png" width=65%>
-_Figure XXX:_
+_Figure 30: evolution of the avg PSNR, discriminator's loss and generator's loss during the training of a model with VGG as content loss_
 
 We then created our test set of images to see the results:
 
@@ -1003,7 +1001,7 @@ _Figure 32: generated images from the test masks in figure 7 using the instance 
 As the toy trainings showed slightly better results when combining both a VGG loss with an L1 loss (LambdaL1 = 100 and LambdaVGG = 100), we then went for a full training with the Low resolution dataset and the same parameters. The training took 5h 26m and the progress values showed similar patterns as previous baselines except for the discriminator's loss, which showed tendency to lower (except for a crazy rise soon recovered) ending down to almost 0. The avg PSNR ended in a much higher value than using only the VGG loss as content loss:
 
 <img src="images/16-VGGplusL1PSNR.png" width=32%> <img src="images/16-VGGplusL1DiscriminatorLoss.png" width=32%> <img src="images/16-VGGplusL1GeneratorLoss.png" width=32%>
-_Figure XXX_
+_Figure 33: evolution of the avg PSNR, discriminator's loss and generator's loss during the training of a model whose content loss combined a VGG + L1_
 
 The expectations where high, but the results where deceiving:
 
@@ -1049,7 +1047,6 @@ Our implementation of pix2pix calculates the average PSNR as a metric of the qua
 
 So to overcome the lack of correspondence between the PSNR and the quality we perceived from the generated images, we calculated the FID for the main trainings made throughout the project. A [complete table](images/20-FIDresults.pdf) can be consulted in the repository. Below you can find a partial result:
 
-XXX Rename baselines? XXX
 ![](images/20-FIDresults.png)
 _Figure 36: Fréchet Inception Distance values for different trainings done in the project_
 
@@ -1107,17 +1104,15 @@ We attacked multiple frontiers as a hope to mitigate, or at least palliate, the 
 
 The table below summarizes set-up and results for multiple experiments. As the control metric we chose FID (‘Fréchet Inception Distance’).
 
-Name | Input size | Train | Test | Epochs | NormLayer | BatchSize | Filtered | Loss | FID | Quality
----- | ---------- | ----- | ---- | ------ | --------- | --------- | -------- | ---- | --- | -------
-Baseline | 286x286 | 135 | 5 | 900 | Batch | 4 | No | L1 | 328,378 | Checkerboard, blurriness, green overexposure
-Baseline 2x2split | 286x286 | 540 | 20 | 900 | Batch | 4 | No | L1 | 299,058 | Baseline model issues + color saturation
-Baseline 2x2split | 286x286 | 540 | 20 | 900 | Instance | 2 | No | L1 | 382,221 | Better color allocation. Checkerboard and blurriness
-Baseline 5x5split | 286x286 | 3376 | 125 | 440 | Instance | 2 | No | L1 | N/A | Some checkerboard in rural landscapes
-Baseline 2x2split | 286x286 | 345 | 20 | 900 | Instance | 2 | Yes | L1 | 264,767 | Slight checkerboard. Most issues solved.
-Baseline increased input size | 542x542 | 135 | 5 | 900 | Batch | 4 | No | L1 | 398,007 | Slightly worse than baseline
-Baseline Regularized | 286x286 | 135 | 5 | 900 | Batch | 4 | No | VGG + L1 | 290,706 | Same issues as baseline and more blurriness
-Baseline Regularized | 286x286 | 135 | 5 | 900 | Batch | 4 | No | VGG  | 232,635 | Slight crispness in images. No checkerboards or color saturation. 
-Final Model | 286x286 | 2150 | 100 | 900 | Instance | 4 | Yes | VGG | 
+Resolution | Input size | Train | Test | NormLayer | Filtered | Loss | FID | Quality
+---------- | ---------- | ----- | ---- | --------- | -------- | ---- | --- | -------
+Low | 286x286 | 135 | 5 | Batch | No | L1 | 328,378 | Checkerboard, blurriness, green overexposure
+Low | 286x286 | 540 | 20 | Batch | No | L1 | 299,058 | Baseline model issues + color saturation
+High | 286x286 | 3376 | 125 | Instance | No | L1 | N/A | Some checkerboard in rural landscapes
+Mid | 286x286 | 345 | 20 | Instance | Yes | L1 | **264,767** | Slight checkerboard. Most issues solved.
+Mid | 542x542 | 135 | 5 | Instance | No | L1 | 398,007 | Slightly worse than baseline
+Low | 286x286 | 135 | 5 | Instance | No | VGG + L1 | 290,706 | Same issues as baseline and more blurriness
+Low | 286x286 | 135 | 5 | Instance | No | VGG  | **232,635** | Slight crispness in images. No checkerboards or color saturation. 
 
 <p align="right"><a href="#toc">To top</a></p>
 
